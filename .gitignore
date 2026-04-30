@@ -6,6 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
+# Environment and vault data
+.env
+.venv/
+
 # Distribution / packaging
 .Python
 build/
@@ -179,3 +183,4 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+.DS_Store
