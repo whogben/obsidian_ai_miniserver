@@ -1,0 +1,1 @@
+This project is defined by `SPEC.md` and `src/obs_ai_ms/models.py` - they are critical context.
