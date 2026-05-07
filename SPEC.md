@@ -15,11 +15,12 @@
 	- Required Arg:
 		- `your/vault/path` (positional, required) — path to the Obsidian vault
 	- Optional Args:
-		- `--admin_token` — sets user 0's token
-		- `--port 8747` - sets the port the server hosts on.
-		- `--host 127.0.0.1` — host to bind to
-		- `--fqdn https://yourdomain.com` - tells the server where it's running so it can generate links to itself
-		- Each of the optional args can be alternately specified via an env var of the same name prefixed with OBS_AI_MS_ in all caps, e.g. OBS_AI_MS_ADMIN_TOKEN, and so on.
+		- `--admin-token` — sets user 0's token
+		- `--port` — server port (default `8747`)
+		- `--host` — host to bind to (default `127.0.0.1`)
+		- `--fqdn` — public URL of this server so it can generate links to itself, e.g. `https://yourdomain.com`
+		- `--base-path` — base path when behind a reverse proxy
+		- Each option can also be set via an env var: `OBS_AI_MS_` plus the SCREAMING_SNAKE form of the flag name, e.g. `OBS_AI_MS_ADMIN_TOKEN`, `OBS_AI_MS_PORT`, `OBS_AI_MS_BASE_PATH`.
 
 **Use**
 - Connect your AI to the MCP or the Open API tool server.
@@ -64,6 +65,10 @@ Alternatively, you can run it in a container with just the Obsidian sync service
 	- test_integration.py
 - scripts/
 	- publish.py <- tests, builds, publishes
+	- update_screenshots.py
+- docs/
+	- images/
+		screenshot_< name >.png
 - pyproject.toml
 - README.md
 - openapi.json <- current OpenAPI spec
@@ -85,6 +90,8 @@ Alternatively, you can run it in a container with just the Obsidian sync service
 - Each major mode and branch of each requestable and outward facing interface.
 - Real connectivity of the mcp and api servers with and without auth.
 - Automatically updates the project root's openapi.json if it has changed
+- Web pages return some of the expected information.
+- Committed screenshots under `docs/images/` match the web UI produced by `update_screenshots.py` for the scripted test vault (regenerate that script when `/web` pages change materially)
 
 **SPEC.md**
 This human-maintained spec file defines the project as a whole.
@@ -108,6 +115,8 @@ Defines the main service class, Vault, which:
 Implements the web routes that are defined in models.py, providing all web ui related functionality.
 - Returns clean and mininamlist HTML via fstrings.
 - Able to render pages from the BasePage descendant models.
+- Minimal CSS style based on dark-gray thats acceptable for users of dark modes
+
 
 **persistence**
 Config data is persisted inside the vault at .obsidian/obsidian_ai_miniserver.json
@@ -123,6 +132,7 @@ Runs pre-deploy checks and gives the option to publish to pypi.
 	- local version > than published
 	- changelog has entry for local version
 	- all tests pass
+	- runs update_screenshots.py
 	- local changes are committed to git
 	- pypi token in env vars or passed in as an arg
 - deploy:
@@ -130,19 +140,51 @@ Runs pre-deploy checks and gives the option to publish to pypi.
 	- tag version on latest commit
 	- publish to pypi
 
+**update_screenshots.py**
+Runs the server with a test vault, sets up some realistic details, and renders the pages as screenshots.
+- Screenshots are only updated (file only modified) if the image has changed.
+- Browser is screenshotted at 600x600 content area size
+- Screenshot List:
+	- "home" showing user "admin" showing 3 users
+	- "users" showing "admin" (admin) and "friend1" (not admin)
+	- "user" showing "friend1" with access:
+		- read only access to "/Templates"
+		- readwrite access to "/OurSharedFolder"
+	- All other pages get screenshots with generic example info, e.g. login, config, etc.
+
 **README.md**
 A brief project readme covering:
 - what it does
 - whats good about it, including
-	- runs without obsidian present / works headless, unlike plugin-based solutions
-	- optimized tool signatures and docs to save tokens
-	- flexible tools like regex search
-	- ability for one ai to admin other ai's access
-	- identical mcp and openapi, easy to build integrations against as well as connect ai
+	- Access anywhere
+		- WebUI for human to manage
+		- MCP http streaming for agents to use
+		- OpenAPI api for agents and web-app integrations
+	- Control Access
+		- Create multiple users with their own keys, different read/write permissions and folder access
+		- Keep your personal vault, personal - while enabling agents access to specific subsets
+	- Highly Flexible
+		- Works for any form of text files in vault, json, etc
+		- AI can do advanced regex searches
+	- Run anywhere
+		- Locally on PC w/ Obsidian app
+		- Headless in container
+			- With ob sync or just from folder
+	- Ruthless minimalism
+		- Single CLI command
+		- Single tool interface for AI
+		- AI able to perform all admin work, once AI connects it can take over setup for you
+	- Less tokens = less cost, faster
+		- Maximally powerful requests to minimize request and param counts
+		- Batch request
+		- Limits, Paging, Sort on all requests, AI can adjust snippet sizes on search results, etc
+		- Minimized docstrings, zero duplication or boilerplate
 - quick start
 - options
 - what it persists in the vault and where
 - local link to openapi file for detailed definitions
+- mix in the home, users and user screenshots ensuring at least one is above the fold
+	- use absolute raw github links so the images show on pypi too
 
 **CHANGELOG.md**
 A standard change log with an entry corresponding to each released version.
@@ -153,7 +195,7 @@ Deploys the mini-server on a docker container with the obsidian sync CLI "ob", e
 	- OBSIDIAN_USERNAME
 	- OBSIDIAN_PASSWORD
 	- OBSIDIAN_VAULTNAME
-	- OBS_AI_MS_PORT
+	- All the OBS_A_MS ENV vars that the server can accept can be passed through
 Inside a Python 3.11 slim container:
 - On Start
 	- install / update to the latest Obsidian Headless CLI via `npm install -g obsidian-headless`
