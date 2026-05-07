@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import re
 import secrets
 import shutil
 from datetime import datetime
@@ -11,6 +12,8 @@ from .models import (
     AdminListUsers,
     AdminUpsertUser,
     AppendText,
+    Batch,
+    BatchResponse,
     Error,
     FileText,
     FilesList,
@@ -20,6 +23,8 @@ from .models import (
     PathAccess,
     ReadText,
     ReplaceText,
+    SearchFiles,
+    SearchResults,
     ServerRequest,
     ServerResponse,
     Success,
@@ -42,8 +47,10 @@ class Vault:
             "replace_text": self._replace_text,
             "move_file": self._move_file,
             "list_files": self._list_files,
+            "search_files": self._search_files,
             "list_users": self._list_users,
             "upsert_user": self._upsert_user,
+            "batch": self._batch,
         }
         self._load_config()
         self._config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -104,11 +111,15 @@ class Vault:
             return Error(message="Access denied")
 
         # Path-based access control
-        if request.kind not in ("get_vault_info", "list_users", "upsert_user"):
+        if request.kind not in ("get_vault_info", "list_users", "upsert_user", "batch"):
             write = request.kind in ("write_text", "append_text", "replace_text", "move_file")
-            path = request.old_path if request.kind == "move_file" else request.path
-            if not self.check_access(user, path, write):
-                return Error(message="Access denied")
+            if request.kind == "move_file":
+                check_paths = [request.old_path]
+            else:
+                check_paths = [request.path]
+            for p in check_paths:
+                if not self.check_access(user, p, write):
+                    return Error(message="Access denied")
             if request.kind == "move_file" and request.new_path:
                 if not self.check_access(user, request.new_path, True):
                     return Error(message="Access denied")
@@ -118,7 +129,7 @@ class Vault:
             return Error(message=f"Unsupported request: {request.kind}")
 
         try:
-            if request.kind == "get_vault_info":
+            if request.kind in ("get_vault_info", "batch"):
                 return handler(request, user)
             return handler(request)
         except ValueError:
@@ -133,11 +144,11 @@ class Vault:
         )
 
     def _read_text(self, req: ReadText) -> FileText | Error:
-        path = self._resolve(req.path)
-        if not path.is_file():
+        resolved = self._resolve(req.path)
+        if not resolved.is_file():
             return Error(message=f"File not found: {req.path}")
-        text = path.read_text()
-        modified = datetime.fromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+        text = resolved.read_text()
+        modified = datetime.fromtimestamp(resolved.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
         limit = len(text) if req.limit == -1 else req.limit
         return FileText(
             text=text[req.offset : req.offset + limit],
@@ -237,6 +248,58 @@ class Vault:
                 unit = "chars" if child.suffix in (".md", ".txt") else "b"
                 out.append((rel, modified, size, f"{rel} | {modified} | {size} {unit}"))
 
+    def _search_files(self, req: SearchFiles) -> SearchResults | Error:
+        base = self._resolve(req.path)
+        if not base.is_dir():
+            return Error(message=f"Directory not found: {req.path}")
+        try:
+            pattern = re.compile(req.pattern)
+        except re.error as e:
+            return Error(message=f"Invalid regex: {e}")
+        matches: list[str] = []
+        self._search_walk(base, req.extensions, req.max_depth, 0, req.path, pattern, req.context_chars, matches)
+        total = len(matches)
+        limit = total if req.limit == -1 else req.limit
+        return SearchResults(
+            results=matches[req.offset : req.offset + limit],
+            length=total,
+            offset=req.offset,
+            limit=limit,
+        )
+
+    def _search_walk(
+        self,
+        dir_path: Path,
+        extensions: list[str],
+        max_depth: int,
+        depth: int,
+        rel_prefix: str,
+        pattern: re.Pattern,
+        context_chars: int,
+        out: list[str],
+    ):
+        if max_depth != -1 and depth >= max_depth:
+            return
+        try:
+            children = sorted(dir_path.iterdir(), key=lambda e: e.name)
+        except PermissionError:
+            return
+        for child in children:
+            if child.name.startswith("."):
+                continue
+            rel = f"{rel_prefix}/{child.name}" if rel_prefix else child.name
+            if child.is_dir():
+                self._search_walk(child, extensions, max_depth, depth + 1, rel, pattern, context_chars, out)
+            elif child.is_file() and (not extensions or child.suffix in extensions):
+                try:
+                    for i, line in enumerate(child.read_text().splitlines(), 1):
+                        for m in pattern.finditer(line):
+                            half = context_chars // 2
+                            ctx = line[max(0, m.start() - half) : m.end() + half]
+                            out.append(f"{rel}:{i} | {m.group()} | {ctx}")
+                except (UnicodeDecodeError, PermissionError):
+                    continue
+
     def _list_users(self, _req: AdminListUsers) -> UsersList:
         return UsersList(users=self.users)
 
@@ -274,3 +337,7 @@ class Vault:
         ))
         self._save_config()
         return Success(message=f"Created user '{req.username}' with token: {token}")
+
+    def _batch(self, req: Batch, user: User) -> BatchResponse:
+        responses = [self.obsidian(r, user) for r in req.requests]
+        return BatchResponse(responses=responses)

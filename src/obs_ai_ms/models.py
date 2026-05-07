@@ -44,7 +44,7 @@ class ReadText(BaseRequest):
     """Read path text."""
 
     kind: Literal["read_text"] = "read_text"
-    paths: str | list[str] = Field(...)
+    path: str = Field(...)
     offset: int = Field(default=0)
     limit: int = Field(default=20_000, description="-1 for unlimited chars.")
 
@@ -135,6 +135,13 @@ class AdminUpsertUser(BaseRequest):
     delete_user: bool | None = Field(default=None)
 
 
+class Batch(BaseRequest):
+    """Send multiple requests, get multiple responses."""
+
+    kind: Literal["batch"] = "batch"
+    requests: list[ServerRequest] = Field(...)
+
+
 class BaseResponse(BaseModel):
     kind: str = Field(..., description="Discriminator for response type")
     model_config = ConfigDict(extra="forbid")
@@ -152,6 +159,13 @@ class Error(BaseResponse):
 
     kind: Literal["error"] = "error"
     message: str = Field(...)
+
+
+class BatchResponse(BaseResponse):
+    """Responses for a batch of requests."""
+
+    kind: Literal["batch_response"] = "batch_response"
+    responses: list[ServerResponse] = Field(...)
 
 
 class VaultInfo(BaseResponse):
@@ -223,6 +237,7 @@ ServerRequest = Annotated[
         SearchFiles,
         AdminListUsers,
         AdminUpsertUser,
+        Batch,
     ],
     Field(discriminator="kind"),
 ]
@@ -236,6 +251,7 @@ ServerResponse = Annotated[
         FilesList,
         SearchResults,
         UsersList,
+        BatchResponse,
     ],
     Field(discriminator="kind"),
 ]

@@ -4,12 +4,14 @@ from obs_ai_ms.models import (
     AdminListUsers,
     AdminUpsertUser,
     AppendText,
+    Batch,
     GetVaultInfo,
     ListFiles,
     MoveFile,
     PathAccess,
     ReadText,
     ReplaceText,
+    SearchFiles,
     User,
     WriteText,
 )
@@ -232,3 +234,66 @@ def test_non_recursive_blocks_subdirectory(vault):
     # Subdirectory should be denied
     resp = vault.obsidian(ReadText(path="notes/test.md"), user)
     assert resp.kind == "error"
+
+
+# --- SearchFiles tests ---
+
+
+def test_search_files(vault, admin):
+    resp = vault.obsidian(SearchFiles(pattern="hello"), admin)
+    assert resp.kind == "search_results"
+    assert resp.length > 0
+    assert any("hello" in m for m in resp.results)
+
+
+def test_search_files_with_path(vault, admin):
+    resp = vault.obsidian(SearchFiles(pattern="content", path="notes"), admin)
+    assert resp.kind == "search_results"
+    assert resp.length > 0
+    # Should find "other content" in notes/other.md
+    assert any("other.md" in m for m in resp.results)
+
+
+def test_search_files_no_results(vault, admin):
+    resp = vault.obsidian(SearchFiles(pattern="xyzzy_nonsense"), admin)
+    assert resp.kind == "search_results"
+    assert resp.length == 0
+
+
+def test_search_files_invalid_regex(vault, admin):
+    resp = vault.obsidian(SearchFiles(pattern="[invalid"), admin)
+    assert resp.kind == "error"
+    assert "invalid regex" in resp.message.lower()
+
+
+def test_search_files_pagination(vault, admin):
+    # Write a file with multiple matches
+    vault.obsidian(WriteText(path="multi.md", text="match\nmatch\nmatch\nmatch\nmatch"), admin)
+    resp = vault.obsidian(SearchFiles(pattern="match", limit=2), admin)
+    assert resp.kind == "search_results"
+    assert len(resp.results) == 2
+    assert resp.length == 5  # total matches
+
+
+# --- Batch tests ---
+
+
+def test_batch(vault, admin):
+    resp = vault.obsidian(Batch(requests=[
+        ReadText(path="notes/test.md"),
+        GetVaultInfo(),
+    ]), admin)
+    assert resp.kind == "batch_response"
+    assert len(resp.responses) == 2
+    assert resp.responses[0].kind == "file_text"
+    assert resp.responses[0].text == "hello world"
+    assert resp.responses[1].kind == "vault_info"
+
+
+def test_batch_access_denied(vault, reader):
+    """Batch should deny sub-requests that fail access control."""
+    resp = vault.obsidian(Batch(requests=[
+        ReadText(path="readme.md"),  # reader can't access this
+    ]), reader)
+    assert resp.kind == "batch_response"
+    assert resp.responses[0].kind == "error"

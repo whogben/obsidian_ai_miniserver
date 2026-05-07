@@ -52,7 +52,13 @@
                       "$ref": "#/components/schemas/FilesList"
                     },
                     {
+                      "$ref": "#/components/schemas/SearchResults"
+                    },
+                    {
                       "$ref": "#/components/schemas/UsersList"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BatchResponse"
                     }
                   ],
                   "discriminator": {
@@ -63,7 +69,9 @@
                       "vault_info": "#/components/schemas/VaultInfo",
                       "file_text": "#/components/schemas/FileText",
                       "files_list": "#/components/schemas/FilesList",
-                      "users_list": "#/components/schemas/UsersList"
+                      "search_results": "#/components/schemas/SearchResults",
+                      "users_list": "#/components/schemas/UsersList",
+                      "batch_response": "#/components/schemas/BatchResponse"
                     }
                   },
                   "title": "Response Obsidian Api Obsidian Post"
@@ -87,6 +95,68 @@
   },
   "components": {
     "schemas": {
+      "BatchResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "batch_response",
+            "title": "Kind",
+            "default": "batch_response"
+          },
+          "responses": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Success"
+                },
+                {
+                  "$ref": "#/components/schemas/Error"
+                },
+                {
+                  "$ref": "#/components/schemas/VaultInfo"
+                },
+                {
+                  "$ref": "#/components/schemas/FileText"
+                },
+                {
+                  "$ref": "#/components/schemas/FilesList"
+                },
+                {
+                  "$ref": "#/components/schemas/SearchResults"
+                },
+                {
+                  "$ref": "#/components/schemas/UsersList"
+                },
+                {
+                  "$ref": "#/components/schemas/BatchResponse"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "kind",
+                "mapping": {
+                  "batch_response": "#/components/schemas/BatchResponse",
+                  "error": "#/components/schemas/Error",
+                  "file_text": "#/components/schemas/FileText",
+                  "files_list": "#/components/schemas/FilesList",
+                  "search_results": "#/components/schemas/SearchResults",
+                  "success": "#/components/schemas/Success",
+                  "users_list": "#/components/schemas/UsersList",
+                  "vault_info": "#/components/schemas/VaultInfo"
+                }
+              }
+            },
+            "type": "array",
+            "title": "Responses"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "responses"
+        ],
+        "title": "BatchResponse",
+        "description": "Responses for a batch of requests."
+      },
       "Error": {
         "properties": {
           "kind": {
@@ -231,6 +301,45 @@
         },
         "type": "object",
         "title": "PathAccess"
+      },
+      "SearchResults": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "search_results",
+            "title": "Kind",
+            "default": "search_results"
+          },
+          "results": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "length": {
+            "type": "integer",
+            "title": "Length"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "results",
+          "length"
+        ],
+        "title": "SearchResults",
+        "description": "Regex search results with context snippets."
       },
       "Success": {
         "properties": {

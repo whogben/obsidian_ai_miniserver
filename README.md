@@ -2,6 +2,14 @@
 
 Makes your Obsidian vault accessible via REST API (OpenAPI) and a streamable HTTP MCP server. Enables AI to find, read, and edit text notes. Supports multiple users with token-based auth and path-level access control.
 
+## What's good about it
+
+- **Works headless** — runs without Obsidian present, unlike plugin-based solutions
+- **Token-efficient** — optimized tool signatures and docs to save tokens
+- **Flexible tools** — regex search across notes, batch requests, and more
+- **AI-managed access** — one AI can admin other AI's access with path-level permissions
+- **Identical MCP and REST API** — easy to build integrations against as well as connect AI
+
 ## Quick start
 
 ```bash
@@ -38,4 +46,6 @@ All requests go to `POST /api/obsidian` with a `kind` field that discriminates t
 - `append_text` — append to a note
 - `replace_text` — find and replace text in a note
 - `move_file` — move, copy, or delete a file
+- `search_files` — regex search across notes and text files with context snippets
+- `batch` — send multiple requests in one call
 - `list_users` / `upsert_user` — admin user management
