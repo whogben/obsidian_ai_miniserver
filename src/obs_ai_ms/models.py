@@ -255,3 +255,93 @@ ServerResponse = Annotated[
     ],
     Field(discriminator="kind"),
 ]
+
+
+class BasePage(BaseModel):
+    """A page of the web UI."""
+
+
+class LoginPage(BasePage):
+    """
+    path: /login
+    title: Login
+    - secret text field: access_token
+    - button: "Login" (logs in the user)
+    - label: error (when present)
+    """
+
+    login_error: str | None = None
+
+
+class HomePage(BasePage):
+    """
+    path: /
+    title: Obsidian AI Mini Server
+    - label: vault_name
+    - link: username -> /users/<username>
+    - link: "Users" -> /users
+    - link: "Config" -> /config
+    - label: server_error (when present)
+    - button: "Logout" (logs out the current user)
+    """
+
+    vault_name: str
+    username: str
+    server_error: str | None = None
+
+
+class ConfigPage(BasePage):
+    """
+    path: /config
+    title: Server Config
+    - label: server_config
+    - labels: vault_path, openapi_port, mcp_port, openapi_base, mcp_path
+    - link: "<user_count> Users" -> /users
+    """
+
+    config: ServerConfig
+
+
+class UsersPage(BasePage):
+    """
+    path: /users
+    title: Users
+    - list: "Users"
+        - link: "<username>" -> /users/<username>
+        - checkbox (disabled) is_admin
+    - link: "Add User" -> /users/add
+    """
+
+    users: list[User]
+
+
+class UserPage(BasePage):
+    """
+    path: /users/<username>
+    title: "User: <username>"
+    - text field: username
+    - secret text field: access_token
+        - inline button: "show"/"hide" toggles token visibility
+    - checkbox: is_admin
+    - list: "Access"
+        - text field: "Path"
+        - checkbox: "Recursive"
+        - checkbox: "Read"
+        - checkbox: "Write"
+        - button: "Delete" (with confirmation popup)
+    - button: "Add Access" (adds a new access list item)
+    - button: "Save Changes" (disabled if no changes yet)
+    - button: "Delete User" (with confirmation, not available for user 0)
+
+    Notes:
+    - if the user does not change the access_token, it will
+    not be modified on save.
+    """
+
+
+class AddUserPage(UserPage):
+    """
+    path: /users/add
+    title: Add User
+    Equivalent to UserPage, but before it has a username and url.
+    """

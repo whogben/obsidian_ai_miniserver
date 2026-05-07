@@ -21,6 +21,7 @@
 **Use**
 - Connect your AI to the MCP or the Open API tool server.
 - It can now make requests via the obsidian tool
+- Visit `127.0.0.1:<openapi_port>/web` for a GUI admin interface for status and user management.
 
 **Single Tool Interface**
 A single function interface accepts different kinds of requests and returns different kinds of responses.
@@ -52,8 +53,9 @@ Alternatively, you can run it in a container with just the Obsidian sync service
 - src/
 	- obs_ai_ms/
 		- entry.py <- CLI command runs this
-		- models.py <- Defines requests and responses
+		- models.py <- Defines requests, responses, and webui
 		- vault.py <- Vault class with the  tool function 
+		- webui.py <- All the `/web` interface details
 - tests/
 	- test_vault.py
 	- test_integration.py
@@ -86,9 +88,11 @@ This human-maintained spec file defines the project as a whole.
 - Changes to the spec can cascade or any other part of the project.
 
 **models.py**
-This human-maintained schemas file details the project’s inputs and outputs.
+This human-maintained schemas file details the project’s inputs and outputs and web ui elements.
 - Single source of truth on all of the possible request and response types with all public information about a tool’s inputs and outputs.
 - Request implementations are to be derived from this file and updated when this file changes. 
+- Web UI pages are described by models descending BasePage.
+- Auth is handled via cookie.
 
 **vault.py**
 Defines the main service class, Vault, which:
@@ -96,6 +100,11 @@ Defines the main service class, Vault, which:
 - ”obsidian” method accepts any single request type and returns any single response type.
 - implements all requests
 - checks for a .obsidian/daily-notes.json with {"folder":"PathTo/Dailies"} to locate a non-root the daily notes folder.
+
+**webui.py**
+Implements the web routes that are defined in models.py, providing all web ui related functionality.
+- Returns clean and mininamlist HTML via fstrings.
+- Able to render pages from the BasePage and BaseComponent descendant models.
 
 **persistence**
 Config data is persisted inside the vault at .obsidian/obsidian_ai_miniserver.json
