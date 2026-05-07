@@ -44,7 +44,7 @@ class ReadText(BaseRequest):
     """Read path text."""
 
     kind: Literal["read_text"] = "read_text"
-    path: str = Field(...)
+    paths: str | list[str] = Field(...)
     offset: int = Field(default=0)
     limit: int = Field(default=20_000, description="-1 for unlimited chars.")
 
@@ -100,6 +100,22 @@ class ListFiles(BaseRequest):
     limit: int = Field(default=100, description="-1 for unlimited results.")
     sort_by: Literal["name", "length", "modified"] = Field(default="name")
     sort_order: Literal["asc", "desc"] = Field(default="asc")
+
+
+class SearchFiles(BaseRequest):
+    """
+    Regex notes & text files and receive matches as
+    <path>:<line> | <match> | <context>
+    """
+
+    kind: Literal["search_files"] = "search_files"
+    pattern: str = Field(...)
+    path: str = Field(default="")
+    extensions: list[str] = Field(default=[".md"])
+    max_depth: int = Field(default=-1)
+    context_chars: int = Field(default=120)
+    offset: int = Field(default=0)
+    limit: int = Field(default=100)
 
 
 class AdminListUsers(BaseRequest):
@@ -176,6 +192,16 @@ class FilesList(BaseResponse):
     limit: int = Field(default=100)
 
 
+class SearchResults(BaseResponse):
+    """Regex search results with context snippets."""
+
+    kind: Literal["search_results"] = "search_results"
+    results: list[str] = Field(...)  # Format: `<path>:<line> | <match> | <context>`
+    length: int = Field(...)
+    offset: int = Field(default=0)
+    limit: int = Field(default=50)
+
+
 class UsersList(BaseResponse):
 
     kind: Literal["users_list"] = "users_list"
@@ -194,6 +220,7 @@ ServerRequest = Annotated[
         AppendText,
         MoveFile,
         ListFiles,
+        SearchFiles,
         AdminListUsers,
         AdminUpsertUser,
     ],
@@ -207,6 +234,7 @@ ServerResponse = Annotated[
         VaultInfo,
         FileText,
         FilesList,
+        SearchResults,
         UsersList,
     ],
     Field(discriminator="kind"),

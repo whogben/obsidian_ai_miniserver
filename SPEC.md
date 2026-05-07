@@ -110,6 +110,12 @@ Runs pre-deploy checks and gives the option to publish to pypi.
 **README.md**
 A brief project readme covering:
 - what it does
+- whats good about it, including
+	- runs without obsidian present / works headless, unlike plugin-based solutions
+	- optimized tool signatures and docs to save tokens
+	- flexible tools like regex search
+	- ability for one ai to admin other ai's access
+	- identical mcp and openapi, easy to build integrations against as well as connect ai
 - quick start
 - options
 - what it persists in the vault and where
