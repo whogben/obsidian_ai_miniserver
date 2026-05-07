@@ -10,6 +10,9 @@ __pycache__/
 .env
 .venv/
 
+# AI tool config
+.kilocode/
+
 # Local dev vault (contains plaintext credentials)
 start/
 

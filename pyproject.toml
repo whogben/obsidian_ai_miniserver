@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "obsidian-ai-miniserver"
+version = "0.1.0"
+description = "Make your Obsidian vault accessible via REST API and MCP server"
+authors = [{ name = "William Hogben", email = "will@willhogben.com" }]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "fastmcp",
+    "pydantic",
+    "typer",
+    "uvicorn",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "httpx",
+    "packaging",
+    "twine",
+    "build",
+]
+
+[project.urls]
+Homepage = "https://github.com/whogben/obsidian_ai_miniserver"
+Repository = "https://github.com/whogben/obsidian_ai_miniserver"
+
+[project.scripts]
+obs_ai_ms = "obs_ai_ms.entry:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]

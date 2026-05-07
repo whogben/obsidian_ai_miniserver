@@ -1,0 +1,383 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Obsidian AI Mini Server",
+    "description": "REST API for accessing an Obsidian vault. Supports reading, writing, listing files, and user management.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/obsidian": {
+      "post": {
+        "summary": "Obsidian Vault Tool",
+        "description": "Access the Obsidian vault. The request body is a JSON object with a **kind** field that determines the operation and its parameters:\n\n- **get_vault_info** \u2014 `{\"kind\":\"get_vault_info\"}` \u2014 Returns vault name, daily-notes folder, and user info.\n- **read_text** \u2014 `{\"kind\":\"read_text\",\"path\":\"...\",\"offset\":0,\"limit\":20000}` \u2014 Read file content. `limit: -1` for unlimited.\n- **write_text** \u2014 `{\"kind\":\"write_text\",\"path\":\"...\",\"text\":\"...\"}` \u2014 Overwrite file with text.\n- **append_text** \u2014 `{\"kind\":\"append_text\",\"path\":\"...\",\"text\":\"...\"}` \u2014 Append text to file.\n- **replace_text** \u2014 `{\"kind\":\"replace_text\",\"path\":\"...\",\"old_text\":\"...\",\"new_text\":\"...\",\"count\":1}` \u2014 Replace text. `count: -1` for all occurrences.\n- **move_file** \u2014 `{\"kind\":\"move_file\",\"old_path\":\"...\",\"new_path\":\"...\",\"make_copy\":false}` \u2014 Move, copy, or delete a file. Set `new_path: \"\"` to delete.\n- **list_files** \u2014 `{\"kind\":\"list_files\",\"path\":\"\",\"extensions\":[\".md\"],\"max_depth\":1,\"offset\":0,\"limit\":100,\"sort_by\":\"name\",\"sort_order\":\"asc\"}` \u2014 List files and folders. `max_depth: -1` or `limit: -1` for unlimited.\n- **list_users** \u2014 `{\"kind\":\"list_users\"}` \u2014 List all users (admin only).\n- **upsert_user** \u2014 `{\"kind\":\"upsert_user\",\"username\":\"...\",\"token\":null,\"access\":null,\"is_admin\":null,\"delete_user\":null}` \u2014 Create, update, or delete a user (admin only).",
+        "operationId": "obsidian_api_obsidian_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Access the Obsidian vault. The request body is a JSON object with a **kind** field that determines the operation and its parameters:\n\n- **get_vault_info** \u2014 `{\"kind\":\"get_vault_info\"}` \u2014 Returns vault name, daily-notes folder, and user info.\n- **read_text** \u2014 `{\"kind\":\"read_text\",\"path\":\"...\",\"offset\":0,\"limit\":20000}` \u2014 Read file content. `limit: -1` for unlimited.\n- **write_text** \u2014 `{\"kind\":\"write_text\",\"path\":\"...\",\"text\":\"...\"}` \u2014 Overwrite file with text.\n- **append_text** \u2014 `{\"kind\":\"append_text\",\"path\":\"...\",\"text\":\"...\"}` \u2014 Append text to file.\n- **replace_text** \u2014 `{\"kind\":\"replace_text\",\"path\":\"...\",\"old_text\":\"...\",\"new_text\":\"...\",\"count\":1}` \u2014 Replace text. `count: -1` for all occurrences.\n- **move_file** \u2014 `{\"kind\":\"move_file\",\"old_path\":\"...\",\"new_path\":\"...\",\"make_copy\":false}` \u2014 Move, copy, or delete a file. Set `new_path: \"\"` to delete.\n- **list_files** \u2014 `{\"kind\":\"list_files\",\"path\":\"\",\"extensions\":[\".md\"],\"max_depth\":1,\"offset\":0,\"limit\":100,\"sort_by\":\"name\",\"sort_order\":\"asc\"}` \u2014 List files and folders. `max_depth: -1` or `limit: -1` for unlimited.\n- **list_users** \u2014 `{\"kind\":\"list_users\"}` \u2014 List all users (admin only).\n- **upsert_user** \u2014 `{\"kind\":\"upsert_user\",\"username\":\"...\",\"token\":null,\"access\":null,\"is_admin\":null,\"delete_user\":null}` \u2014 Create, update, or delete a user (admin only).\n",
+              "title": "Request"
+            },
+            "description": "Access the Obsidian vault. The request body is a JSON object with a **kind** field that determines the operation and its parameters:\n\n- **get_vault_info** \u2014 `{\"kind\":\"get_vault_info\"}` \u2014 Returns vault name, daily-notes folder, and user info.\n- **read_text** \u2014 `{\"kind\":\"read_text\",\"path\":\"...\",\"offset\":0,\"limit\":20000}` \u2014 Read file content. `limit: -1` for unlimited.\n- **write_text** \u2014 `{\"kind\":\"write_text\",\"path\":\"...\",\"text\":\"...\"}` \u2014 Overwrite file with text.\n- **append_text** \u2014 `{\"kind\":\"append_text\",\"path\":\"...\",\"text\":\"...\"}` \u2014 Append text to file.\n- **replace_text** \u2014 `{\"kind\":\"replace_text\",\"path\":\"...\",\"old_text\":\"...\",\"new_text\":\"...\",\"count\":1}` \u2014 Replace text. `count: -1` for all occurrences.\n- **move_file** \u2014 `{\"kind\":\"move_file\",\"old_path\":\"...\",\"new_path\":\"...\",\"make_copy\":false}` \u2014 Move, copy, or delete a file. Set `new_path: \"\"` to delete.\n- **list_files** \u2014 `{\"kind\":\"list_files\",\"path\":\"\",\"extensions\":[\".md\"],\"max_depth\":1,\"offset\":0,\"limit\":100,\"sort_by\":\"name\",\"sort_order\":\"asc\"}` \u2014 List files and folders. `max_depth: -1` or `limit: -1` for unlimited.\n- **list_users** \u2014 `{\"kind\":\"list_users\"}` \u2014 List all users (admin only).\n- **upsert_user** \u2014 `{\"kind\":\"upsert_user\",\"username\":\"...\",\"token\":null,\"access\":null,\"is_admin\":null,\"delete_user\":null}` \u2014 Create, update, or delete a user (admin only).\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VaultInfo"
+                    },
+                    {
+                      "$ref": "#/components/schemas/FileText"
+                    },
+                    {
+                      "$ref": "#/components/schemas/FilesList"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UsersList"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "success": "#/components/schemas/Success",
+                      "error": "#/components/schemas/Error",
+                      "vault_info": "#/components/schemas/VaultInfo",
+                      "file_text": "#/components/schemas/FileText",
+                      "files_list": "#/components/schemas/FilesList",
+                      "users_list": "#/components/schemas/UsersList"
+                    }
+                  },
+                  "title": "Response Obsidian Api Obsidian Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "error",
+            "title": "Kind",
+            "default": "error"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "Error",
+        "description": "Request failed."
+      },
+      "FileText": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "file_text",
+            "title": "Kind",
+            "default": "file_text"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "length": {
+            "type": "integer",
+            "title": "Length"
+          },
+          "modified_at": {
+            "type": "string",
+            "title": "Modified At"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 20000
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "length",
+          "modified_at"
+        ],
+        "title": "FileText",
+        "description": "If offset > 0 or length > limit, the text is an excerpt."
+      },
+      "FilesList": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "files_list",
+            "title": "Kind",
+            "default": "files_list"
+          },
+          "base_path": {
+            "type": "string",
+            "title": "Base Path",
+            "default": ""
+          },
+          "results": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "length": {
+            "type": "integer",
+            "title": "Length"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 100
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "results",
+          "length"
+        ],
+        "title": "FilesList",
+        "description": "List of files and folders relative to the base path.\nIf offset > 0 or length > limit, the results are an excerpt."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "PathAccess": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "default": "/"
+          },
+          "read": {
+            "type": "boolean",
+            "title": "Read",
+            "default": true
+          },
+          "write": {
+            "type": "boolean",
+            "title": "Write",
+            "default": true
+          },
+          "recursive": {
+            "type": "boolean",
+            "title": "Recursive",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "PathAccess"
+      },
+      "Success": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "success",
+            "title": "Kind",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Success",
+        "description": "Default response."
+      },
+      "User": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": "admin"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "default": ""
+          },
+          "access": {
+            "items": {
+              "$ref": "#/components/schemas/PathAccess"
+            },
+            "type": "array",
+            "title": "Access"
+          },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "User"
+      },
+      "UsersList": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "users_list",
+            "title": "Kind",
+            "default": "users_list"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/User"
+            },
+            "type": "array",
+            "title": "Users"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "users"
+        ],
+        "title": "UsersList"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VaultInfo": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "vault_info",
+            "title": "Kind",
+            "default": "vault_info"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "daily_notes_folder": {
+            "type": "string",
+            "title": "Daily Notes Folder",
+            "default": ""
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "user"
+        ],
+        "title": "VaultInfo",
+        "description": "Name, path to daily notes."
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
