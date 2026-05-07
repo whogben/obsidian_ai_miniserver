@@ -27,7 +27,7 @@ Config is stored at `.obsidian/obsidian_ai_miniserver.json` inside the vault —
 
 ## API reference
 
-See [`openapi.json`](openapi.json) for full request/response definitions.
+See [`openapi.json`](https://github.com/whogben/obsidian_ai_miniserver/blob/main/openapi.json) for full request/response definitions.
 
 All requests go to `POST /api/obsidian` with a `kind` field that discriminates the request type. Available kinds:
 

@@ -4,8 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "obsidian-ai-miniserver"
-version = "0.1.0"
-description = "Make your Obsidian vault accessible via REST API and MCP server"
+version = "0.1.1"
+description = "Expose your Obsidian vault via REST API and streamable HTTP MCP server for AI tool access"
+readme = "README.md"
 authors = [{ name = "William Hogben", email = "will@willhogben.com" }]
 requires-python = ">=3.11"
 dependencies = [

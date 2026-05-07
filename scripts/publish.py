@@ -2,6 +2,7 @@
 """Pre-deploy checks and PyPI publish script."""
 
 import argparse
+import glob
 import os
 import subprocess
 import sys
@@ -96,11 +97,11 @@ def check_git_clean() -> bool:
 
 
 def check_token(token: str | None) -> str | None:
-    tok = token or os.environ.get("TWINE_TOKEN")
+    tok = token or os.environ.get("TWINE_TOKEN") or os.environ.get("TWINE_PASSWORD")
     if tok:
         print("  ✓ PyPI token present")
         return tok
-    print("  ✗ No PyPI token (set TWINE_TOKEN or pass --token)")
+    print("  ✗ No PyPI token (set TWINE_TOKEN or TWINE_PASSWORD or pass --token)")
     return None
 
 
@@ -129,20 +130,33 @@ def run_checks(token: str | None) -> tuple[bool, str | None]:
 def deploy(version: str, token: str) -> None:
     print(f"\nDeploying v{version}...\n")
 
+    # Clean old dist files
+    for f in glob.glob(str(ROOT / "dist" / "*")):
+        os.remove(f)
+
     # Build distributables
     print("  Building distributables...")
     subprocess.run([sys.executable, "-m", "build"], cwd=ROOT, check=True)
 
-    # Git tag
+    # Git tag (skip if already exists from a partial deploy)
     tag = f"v{version}"
-    print(f"  Tagging {tag}...")
-    subprocess.run(["git", "tag", tag], cwd=ROOT, check=True)
+    existing = subprocess.run(
+        ["git", "tag", "-l", tag], cwd=ROOT, capture_output=True, text=True
+    )
+    if existing.stdout.strip():
+        print(f"  Tag {tag} already exists, skipping")
+    else:
+        print(f"  Tagging {tag}...")
+        subprocess.run(["git", "tag", tag], cwd=ROOT, check=True)
 
     # Upload to PyPI
     print("  Uploading to PyPI...")
-    dist_glob = str(ROOT / "dist" / "*")
+    dist_files = sorted(glob.glob(str(ROOT / "dist" / "*")))
+    if not dist_files:
+        print("  ✗ No files found in dist/")
+        sys.exit(1)
     subprocess.run(
-        ["twine", "upload", dist_glob],
+        ["twine", "upload", *dist_files],
         env={**os.environ, "TWINE_PASSWORD": token, "TWINE_USERNAME": "__token__"},
         check=True,
     )

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.1] - 2026-05-07
+
+### Added
+
+- PyPI package description and readme
+- OpenWebUI compatibility fixes
+- Review fixes
+
 ## [0.1.0] - 2026-05-06
 
 ### Added
