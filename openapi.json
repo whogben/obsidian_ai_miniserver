@@ -3,7 +3,7 @@
   "info": {
     "title": "Obsidian AI Mini Server",
     "description": "REST API for accessing an Obsidian vault. Supports reading, writing, listing files, and user management.",
-    "version": "0.1.0"
+    "version": "0.2.1"
   },
   "paths": {
     "/api/obsidian": {

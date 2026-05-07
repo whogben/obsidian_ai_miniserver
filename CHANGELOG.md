@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.1] - 2026-05-07
+
+### Added
+
+- Environment variable support for all CLI options (`OBS_AI_MS_HOST`, `OBS_AI_MS_OPENAPI_PORT`, `OBS_AI_MS_MCP_PORT`)
+- Self-contained `docker-compose.yaml` for headless deployment with Obsidian Headless sync CLI
+- Headless deployment section in README
+
 ## [0.2.0] - 2026-05-07
 
 ### Added

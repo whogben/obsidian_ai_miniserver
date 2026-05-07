@@ -49,7 +49,7 @@ def create_api(vault: Vault) -> FastAPI:
     api = FastAPI(
         title="Obsidian AI Mini Server",
         description="REST API for accessing an Obsidian vault. Supports reading, writing, listing files, and user management.",
-        version="0.1.0",
+        version="0.2.1",
         openapi_url="/api/openapi.json",
         docs_url="/api/docs",
     )
@@ -144,9 +144,9 @@ def create_mcp(vault: Vault) -> FastMCP:
 def start(
     vault_path: str = typer.Argument(".", help="Path to the Obsidian vault (defaults to current directory)"),
     admin_token: str = typer.Option("", envvar="OBS_AI_MS_ADMIN_TOKEN", help="Admin user token"),
-    host: str = typer.Option("127.0.0.1", help="Host to bind to"),
-    openapi_port: int = typer.Option(8747, help="OpenAPI port (-1 to disable)"),
-    mcp_port: int = typer.Option(8716, help="MCP port (-1 to disable)"),
+    host: str = typer.Option("127.0.0.1", envvar="OBS_AI_MS_HOST", help="Host to bind to"),
+    openapi_port: int = typer.Option(8747, envvar="OBS_AI_MS_OPENAPI_PORT", help="OpenAPI port (-1 to disable)"),
+    mcp_port: int = typer.Option(8716, envvar="OBS_AI_MS_MCP_PORT", help="MCP port (-1 to disable)"),
 ):
     """Start the Obsidian AI Mini Server."""
     resolved = Path(vault_path).expanduser().resolve()
