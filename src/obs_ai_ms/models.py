@@ -7,10 +7,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ServerConfig(BaseModel):
     vault_path: str = Field(...)
-    openapi_port: int = Field(default=8747)
-    mcp_port: int = Field(default=8716)
-    openapi_base: str = Field(default="/api")
-    mcp_path: str = Field(default="/mcp")
+    address: str = Field(default="127.0.0.1")
+    port: int = Field(default=8747)
+    fqdn: str = Field(default="")
+    base_path: str = Field(default="")  # path before /web, /api, /mcp, etc
     users: list[User] = Field(default_factory=lambda: [User()])
     # first user is admin and cant be removed
 
@@ -278,15 +278,20 @@ class HomePage(BasePage):
     path: /
     title: Obsidian AI Mini Server
     - label: vault_name
+    - label: server_error (when present)
+    - labels: web_fqdn, api_fqdn, mcp_fqdn
+    - paragraph: show the header auth setup and any other key setup details
     - link: username -> /users/<username>
     - link: "Users" -> /users
     - link: "Config" -> /config
-    - label: server_error (when present)
     - button: "Logout" (logs out the current user)
     """
 
     vault_name: str
     username: str
+    web_fqdn: str
+    api_fqdn: str
+    mcp_fqdn: str
     server_error: str | None = None
 
 
@@ -295,7 +300,7 @@ class ConfigPage(BasePage):
     path: /config
     title: Server Config
     - label: server_config
-    - labels: vault_path, openapi_port, mcp_port, openapi_base, mcp_path
+    - labels: vault_path, address, port, base_path
     - link: "<user_count> Users" -> /users
     """
 

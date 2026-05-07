@@ -2,7 +2,10 @@
 ## Design
 
 **Goals**
-- Make my Obsidian vault accessible via REST API and an MCP server.
+- Make my Obsidian vault accessible via multiple AI-friendly interfaces:
+	- `/api` for OpenAPI (`/api/openapi.json`)
+	- `/web` for Web UI
+	- `/mcp` for MCP server (streamable HTTP)
 - Enable AI to easily find, read and edit text notes.
 - Allow for multiple users with limited access, identified by token sent in `Authorization: Bearer` headers.
 
@@ -13,15 +16,15 @@
 		- `your/vault/path` (positional, required) — path to the Obsidian vault
 	- Optional Args:
 		- `--admin_token` — sets user 0's token
-		- `--openapi_port 8747` — hosts OpenAPI API, set to -1 to disable
-		- `--mcp_port 8716` — hosts MCP over streamable HTTP, set to -1 to disable
+		- `--port 8747` - sets the port the server hosts on.
 		- `--host 127.0.0.1` — host to bind to
+		- `--fqdn https://yourdomain.com` - tells the server where it's running so it can generate links to itself
 		- Each of the optional args can be alternately specified via an env var of the same name prefixed with OBS_AI_MS_ in all caps, e.g. OBS_AI_MS_ADMIN_TOKEN, and so on.
 
 **Use**
 - Connect your AI to the MCP or the Open API tool server.
 - It can now make requests via the obsidian tool
-- Visit `127.0.0.1:<openapi_port>/web` for a GUI admin interface for status and user management.
+- Visit `127.0.0.1:<port>/web` for a GUI admin interface for status and user management.
 
 **Single Tool Interface**
 A single function interface accepts different kinds of requests and returns different kinds of responses.
@@ -104,13 +107,13 @@ Defines the main service class, Vault, which:
 **webui.py**
 Implements the web routes that are defined in models.py, providing all web ui related functionality.
 - Returns clean and mininamlist HTML via fstrings.
-- Able to render pages from the BasePage and BaseComponent descendant models.
+- Able to render pages from the BasePage descendant models.
 
 **persistence**
 Config data is persisted inside the vault at .obsidian/obsidian_ai_miniserver.json
 
 **entry.py**
-Run by the CLI command to start the server(s).
+Run by the CLI command to start the combined server with OpenAPI, Streamable HTTP MCP, and the Web UI
 - creates a shared vault instance
 - creates the mcp and/or api servers that wrap the vault’s obsidian request tool
 
@@ -150,8 +153,7 @@ Deploys the mini-server on a docker container with the obsidian sync CLI "ob", e
 	- OBSIDIAN_USERNAME
 	- OBSIDIAN_PASSWORD
 	- OBSIDIAN_VAULTNAME
-	- OBS_AI_MS_OPENAPI_PORT
-	- OBS_AI_MS_MCP_PORT
+	- OBS_AI_MS_PORT
 Inside a Python 3.11 slim container:
 - On Start
 	- install / update to the latest Obsidian Headless CLI via `npm install -g obsidian-headless`
