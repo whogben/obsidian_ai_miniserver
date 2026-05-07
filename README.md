@@ -2,13 +2,41 @@
 
 Makes your Obsidian vault accessible via REST API (OpenAPI) and a streamable HTTP MCP server. Enables AI to find, read, and edit text notes. Supports multiple users with token-based auth and path-level access control.
 
+<img src="https://raw.githubusercontent.com/whogben/obsidian_ai_miniserver/main/docs/images/screenshot_home.png" alt="Home page showing admin user" width="600">
+
 ## What's good about it
 
-- **Works headless** — runs without Obsidian present using just the raw vault files (unlike plugin-based solutions that require the full electron app to run).
-- **Token-efficient** — optimized tool signatures and docs to save tokens
-- **Flexible tools** — regex search across notes, batch requests, and more
-- **AI-managed access** — one AI can admin other AI's access with path-level permissions
-- **Identical MCP and REST API** — easy to build integrations against as well as connect AI
+### Access anywhere
+- WebUI for human to manage
+- MCP http streaming for agents to use
+- OpenAPI api for agents and web-app integrations
+
+### Control Access
+- Create multiple users with their own keys, different read/write permissions and folder access
+- Keep your personal vault, personal — while enabling agents access to specific subsets
+
+<img src="https://raw.githubusercontent.com/whogben/obsidian_ai_miniserver/main/docs/images/screenshot_users.png" alt="Users list" width="500">
+
+### Highly Flexible
+- Works for any form of text files in vault, json, etc
+- AI can do advanced regex searches
+
+### Run anywhere
+- Locally on PC w/ Obsidian app
+- Headless in container — With ob sync or just from folder
+
+### Ruthless minimalism
+- Single CLI command
+- Single tool interface for AI
+- AI able to perform all admin work, once AI connects it can take over setup for you
+
+<img src="https://raw.githubusercontent.com/whogben/obsidian_ai_miniserver/main/docs/images/screenshot_user.png" alt="User detail with access rules" width="500">
+
+### Less tokens = less cost, faster
+- Maximally powerful requests to minimize request and param counts
+- Batch request
+- Limits, Paging, Sort on all requests, AI can adjust snippet sizes on search results, etc
+- Minimized docstrings, zero duplication or boilerplate
 
 ## Quick start
 
@@ -19,19 +47,26 @@ obs_ai_ms start /path/to/vault --admin-token your_token
 
 This starts both servers on their default ports. Connect your AI to the MCP endpoint or the REST API.
 
+<img src="https://raw.githubusercontent.com/whogben/obsidian_ai_miniserver/main/docs/images/screenshot_login.png" alt="Login page" width="400">
+
 ## Options
 
 | Option | Env Var | Default | Description |
 | --- | --- | --- | --- |
 | `vault_path` | — | *(required)* | Path to the Obsidian vault |
 | `--admin-token` | `OBS_AI_MS_ADMIN_TOKEN` | *(none)* | Auth token for the admin user |
-| `--openapi-port` | `OBS_AI_MS_OPENAPI_PORT` | `8747` | Port for the REST API server (`-1` to disable) |
-| `--mcp-port` | `OBS_AI_MS_MCP_PORT` | `8716` | Port for the MCP server (`-1` to disable) |
+| `--port` | `OBS_AI_MS_PORT` | `8747` | Server port |
 | `--host` | `OBS_AI_MS_HOST` | `127.0.0.1` | Host to bind to. Use `0.0.0.0` to allow remote access |
+| `--fqdn` | `OBS_AI_MS_FQDN` | *(none)* | Public URL for self-linking |
+| `--base-path` | `OBS_AI_MS_BASE_PATH` | *(none)* | Base path when behind a reverse proxy |
+
+<img src="https://raw.githubusercontent.com/whogben/obsidian_ai_miniserver/main/docs/images/screenshot_config.png" alt="Config page" width="500">
 
 ## Persistence
 
 Config is stored at `.obsidian/obsidian_ai_miniserver.json` inside the vault — user list with tokens and path access rules.
+
+<img src="https://raw.githubusercontent.com/whogben/obsidian_ai_miniserver/main/docs/images/screenshot_add_user.png" alt="Add user page" width="500">
 
 ## Headless deployment
 
@@ -44,6 +79,11 @@ You can paste it directly into a container platform like [Coolify](https://cooli
 | `OBSIDIAN_USERNAME` | Your Obsidian account email |
 | `OBSIDIAN_PASSWORD` | Your Obsidian account password |
 | `OBSIDIAN_VAULTNAME` | Name of your remote vault |
+| `OBS_AI_MS_ADMIN_TOKEN` | Admin auth token |
+| `OBS_AI_MS_HOST` | Host to bind to (default `0.0.0.0`) |
+| `OBS_AI_MS_PORT` | Server port (default `8747`) |
+| `OBS_AI_MS_FQDN` | Public URL for self-linking |
+| `OBS_AI_MS_BASE_PATH` | Base path when behind a reverse proxy |
 
 Or via CLI:
 

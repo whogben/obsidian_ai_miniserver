@@ -5,11 +5,13 @@ services:
       - OBSIDIAN_USERNAME=${OBSIDIAN_USERNAME}
       - OBSIDIAN_PASSWORD=${OBSIDIAN_PASSWORD}
       - OBSIDIAN_VAULTNAME=${OBSIDIAN_VAULTNAME}
-      - OBS_AI_MS_OPENAPI_PORT=${OBS_AI_MS_OPENAPI_PORT:-8747}
-      - OBS_AI_MS_MCP_PORT=${OBS_AI_MS_MCP_PORT:-8716}
+      - OBS_AI_MS_ADMIN_TOKEN=${OBS_AI_MS_ADMIN_TOKEN:-}
+      - OBS_AI_MS_HOST=${OBS_AI_MS_HOST:-0.0.0.0}
+      - OBS_AI_MS_PORT=${OBS_AI_MS_PORT:-8747}
+      - OBS_AI_MS_FQDN=${OBS_AI_MS_FQDN:-}
+      - OBS_AI_MS_BASE_PATH=${OBS_AI_MS_BASE_PATH:-}
     ports:
-      - "${OBS_AI_MS_OPENAPI_PORT:-8747}:${OBS_AI_MS_OPENAPI_PORT:-8747}"
-      - "${OBS_AI_MS_MCP_PORT:-8716}:${OBS_AI_MS_MCP_PORT:-8716}"
+      - "${OBS_AI_MS_PORT:-8747}:${OBS_AI_MS_PORT:-8747}"
     volumes:
       - vaults:/vaults
     command: ["/bin/bash", "-c", "
@@ -31,7 +33,7 @@ services:
       pip install --upgrade obsidian-ai-miniserver\n
       \n
       ob sync --continuous --path \"$$VAULT_PATH\" &\n
-      exec obs_ai_ms start \"$$VAULT_PATH\" --host 0.0.0.0\n
+      exec obs_ai_ms start \"$$VAULT_PATH\"\n
     "]
 
 volumes:

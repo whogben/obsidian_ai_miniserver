@@ -1,21 +1,37 @@
 from __future__ import annotations
 
-import asyncio
-import json
 import warnings
+from contextlib import asynccontextmanager
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 
 import typer
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_request
 
 from pydantic import TypeAdapter
 
-from .models import Error, ServerRequest, ServerResponse
+from .models import (
+    AddUserPage,
+    AdminUpsertUser,
+    ConfigPage,
+    Error,
+    HomePage,
+    LoginPage,
+    PathAccess,
+    ServerConfig,
+    ServerRequest,
+    ServerResponse,
+    User,
+    UserPage,
+    UsersPage,
+)
 from .vault import Vault
+from .webui import render_add_user, render_config, render_home, render_login, render_user, render_users
 
 app = typer.Typer()
 
@@ -40,19 +56,57 @@ def _authenticate(vault: Vault, token: str | None):
     return vault.authenticate(token)
 
 
+def _parse_access(form) -> list[PathAccess]:
+    """Parse access rules from form data, grouping by access_path markers."""
+    rules: list[PathAccess] = []
+    cur: PathAccess | None = None
+    for key, val in form.multi_items():
+        if key == "access_path":
+            if cur is not None:
+                rules.append(cur)
+            cur = PathAccess(path=val)
+        elif cur is not None:
+            if key == "access_recursive":
+                cur.recursive = True
+            elif key == "access_read":
+                cur.read = True
+            elif key == "access_write":
+                cur.write = True
+    if cur is not None:
+        rules.append(cur)
+    return rules
+
+
 # --- FastAPI ---
 
 _bearer = HTTPBearer(auto_error=False)
 
 
-def create_api(vault: Vault) -> FastAPI:
+class _WebRedirect(Exception):
+    """Raised by _web_user dependency to redirect unauthenticated requests."""
+    def __init__(self, url: str):
+        self.url = url
+
+
+def create_api(vault: Vault, config: ServerConfig | None = None, lifespan=None) -> FastAPI:
+    if config is None:
+        config = ServerConfig(vault_path=str(vault.vault_path))
+    try:
+        _ver = _pkg_version("obsidian-ai-miniserver")
+    except PackageNotFoundError:
+        _ver = "0.0.0-dev"
     api = FastAPI(
         title="Obsidian AI Mini Server",
         description="REST API for accessing an Obsidian vault. Supports reading, writing, listing files, and user management.",
-        version="0.2.1",
+        version=_ver,
         openapi_url="/api/openapi.json",
         docs_url="/api/docs",
+        lifespan=lifespan,
     )
+
+    @api.exception_handler(_WebRedirect)
+    async def _redirect_handler(request, exc):
+        return RedirectResponse(exc.url, status_code=303)
 
     _DESC = (
         "Access the Obsidian vault. The request body is a JSON object with a **kind** "
@@ -84,6 +138,122 @@ def create_api(vault: Vault) -> FastAPI:
         if not user:
             raise HTTPException(status_code=401, detail="Invalid token")
         return vault.obsidian(parsed, user)
+
+    # --- Web UI ---
+
+    def _web_user(
+        obs_token: str | None = Cookie(default=None),
+    ) -> User:
+        if not obs_token:
+            raise _WebRedirect("/web/login")
+        user = _authenticate(vault, obs_token)
+        if not user:
+            raise _WebRedirect("/web/login")
+        if not user.is_admin:
+            raise HTTPException(status_code=403, detail="Admin access required")
+        return user
+
+    @api.get("/web/login", response_class=HTMLResponse)
+    def web_login(request: Request):
+        if _authenticate(vault, request.cookies.get("obs_token")):
+            return RedirectResponse("/web/", status_code=303)
+        return HTMLResponse(render_login(LoginPage(), base_path=config.base_path))
+
+    @api.post("/web/login")
+    async def web_login_post(request: Request):
+        form = await request.form()
+        access_token = form.get("access_token", "")
+        user = vault.authenticate(access_token) if access_token else None
+        if not user:
+            return HTMLResponse(render_login(LoginPage(login_error="Invalid token"), base_path=config.base_path))
+        resp = RedirectResponse("/web/", status_code=303)
+        resp.set_cookie("obs_token", access_token, httponly=True, samesite="strict", path="/web", secure=config.fqdn.startswith("https"))
+        return resp
+
+    @api.post("/web/logout")
+    def web_logout():
+        resp = RedirectResponse("/web/login", status_code=303)
+        resp.delete_cookie("obs_token", path="/web")
+        return resp
+
+    @api.get("/web/", response_class=HTMLResponse)
+    def web_home(user: User = Depends(_web_user)):
+        fqdn = config.fqdn or f"http://{config.address}:{config.port}"
+        bp = config.base_path
+        return HTMLResponse(render_home(HomePage(
+            vault_name=vault.vault_path.name,
+            username=user.username,
+            web_fqdn=f"{fqdn}{bp}/web",
+            api_fqdn=f"{fqdn}{bp}/api",
+            mcp_fqdn=f"{fqdn}{bp}/mcp",
+        ), base_path=config.base_path))
+
+    @api.get("/web/config", response_class=HTMLResponse)
+    def web_config(user: User = Depends(_web_user)):
+        page_config = config.model_copy(update={"users": list(vault.users)})
+        return HTMLResponse(render_config(ConfigPage(config=page_config), base_path=config.base_path))
+
+    @api.get("/web/users", response_class=HTMLResponse)
+    def web_users(user: User = Depends(_web_user)):
+        return HTMLResponse(render_users(UsersPage(users=vault.users), base_path=config.base_path))
+
+    @api.get("/web/users/add", response_class=HTMLResponse)
+    def web_user_add_form(user: User = Depends(_web_user)):
+        return HTMLResponse(render_add_user(AddUserPage(), User(), base_path=config.base_path))
+
+    @api.post("/web/users/add")
+    async def web_user_add_post(request: Request, auth_user: User = Depends(_web_user)):
+        form = await request.form()
+        vault.obsidian(AdminUpsertUser(
+            username=form.get("username", ""),
+            token=form.get("access_token", "") or None,
+            is_admin="is_admin" in form,
+            access=_parse_access(form),
+        ), auth_user)
+        return RedirectResponse("/web/users", status_code=303)
+
+    @api.get("/web/users/{username}", response_class=HTMLResponse)
+    def web_user_page(username: str, user: User = Depends(_web_user)):
+        for i, u in enumerate(vault.users):
+            if u.username == username:
+                return HTMLResponse(render_user(UserPage(), u, i, base_path=config.base_path))
+        return RedirectResponse("/web/users", status_code=303)
+
+    @api.post("/web/users/{username}")
+    async def web_user_save(request: Request, username: str, auth_user: User = Depends(_web_user)):
+        form = await request.form()
+
+        # Re-render with modified access list (no save)
+        if "add_access" in form or "delete_access" in form:
+            form_user = User(
+                username=form.get("username", username),
+                token=form.get("access_token", ""),
+                is_admin="is_admin" in form,
+                access=_parse_access(form),
+            )
+            if "add_access" in form:
+                form_user.access.append(PathAccess())
+            elif "delete_access" in form:
+                try:
+                    idx = int(form.get("delete_access", "-1"))
+                except ValueError:
+                    idx = -1
+                form_user.access = [a for i, a in enumerate(form_user.access) if i != idx]
+            user_idx = next((i for i, u in enumerate(vault.users) if u.username == username), -1)
+            return HTMLResponse(render_user(UserPage(), form_user, user_idx, base_path=config.base_path))
+
+        vault.obsidian(AdminUpsertUser(
+            username=form.get("username", username),
+            token=form.get("access_token", "") or None,
+            is_admin="is_admin" in form,
+            access=_parse_access(form),
+        ), auth_user)
+        return RedirectResponse("/web/users", status_code=303)
+
+    @api.post("/web/users/{username}/delete")
+    def web_user_delete(username: str, auth_user: User = Depends(_web_user)):
+        vault.obsidian(AdminUpsertUser(username=username, delete_user=True), auth_user)
+        return RedirectResponse("/web/users", status_code=303)
 
     return api
 
@@ -145,8 +315,9 @@ def start(
     vault_path: str = typer.Argument(".", help="Path to the Obsidian vault (defaults to current directory)"),
     admin_token: str = typer.Option("", envvar="OBS_AI_MS_ADMIN_TOKEN", help="Admin user token"),
     host: str = typer.Option("127.0.0.1", envvar="OBS_AI_MS_HOST", help="Host to bind to"),
-    openapi_port: int = typer.Option(8747, envvar="OBS_AI_MS_OPENAPI_PORT", help="OpenAPI port (-1 to disable)"),
-    mcp_port: int = typer.Option(8716, envvar="OBS_AI_MS_MCP_PORT", help="MCP port (-1 to disable)"),
+    port: int = typer.Option(8747, envvar="OBS_AI_MS_PORT", help="Server port"),
+    fqdn: str = typer.Option("", envvar="OBS_AI_MS_FQDN", help="Public URL of this server"),
+    base_path: str = typer.Option("", envvar="OBS_AI_MS_BASE_PATH", help="Base path for reverse proxy"),
 ):
     """Start the Obsidian AI Mini Server."""
     resolved = Path(vault_path).expanduser().resolve()
@@ -158,25 +329,26 @@ def start(
         vault.users[0].token = admin_token
         vault._save_config()
 
-    tasks = []
+    config = ServerConfig(
+        vault_path=str(resolved),
+        address=host,
+        port=port,
+        fqdn=fqdn,
+        base_path=base_path,
+    )
 
-    if openapi_port != -1:
-        api = create_api(vault)
-        config = uvicorn.Config(api, host=host, port=openapi_port)
-        tasks.append(uvicorn.Server(config).serve())
+    mcp = create_mcp(vault)
+    mcp_asgi = mcp.http_app(transport="streamable-http", path="/")
 
-    if mcp_port != -1:
-        mcp = create_mcp(vault)
-        tasks.append(mcp.run_async(transport="streamable-http", host=host, port=mcp_port, show_banner=False))
+    @asynccontextmanager
+    async def lifespan(app):
+        async with mcp_asgi.router.lifespan_context(mcp_asgi):
+            yield
 
-    if not tasks:
-        typer.echo("No servers enabled. Set openapi_port or mcp_port to a valid port.")
-        raise typer.Exit(1)
+    api = create_api(vault, config, lifespan=lifespan)
+    api.mount("/mcp", mcp_asgi)
 
-    async def _run():
-        await asyncio.gather(*tasks)
-
-    asyncio.run(_run())
+    uvicorn.run(api, host=host, port=port)
 
 
 if __name__ == "__main__":

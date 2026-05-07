@@ -5,6 +5,7 @@ import json
 import socket
 import threading
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
@@ -81,21 +82,25 @@ def api_server(vault):
 
 @pytest.fixture
 def mcp_server(vault):
-    """Start MCP HTTP server on a random port, yield base URL."""
+    """Start combined API+MCP server on a random port, yield MCP base URL."""
     mcp = create_mcp(vault)
+    mcp_asgi = mcp.http_app(transport="streamable-http", path="/")
+
+    @asynccontextmanager
+    async def lifespan(app):
+        async with mcp_asgi.router.lifespan_context(mcp_asgi):
+            yield
+
+    api = create_api(vault, lifespan=lifespan)
+    api.mount("/mcp", mcp_asgi)
+
     port = _find_port()
-
-    def _run():
-        asyncio.run(
-            mcp.run_async(
-                transport="streamable-http",
-                host="127.0.0.1",
-                port=port,
-                show_banner=False,
-            )
-        )
-
-    threading.Thread(target=_run, daemon=True).start()
+    threading.Thread(
+        target=uvicorn.run,
+        args=(api,),
+        kwargs={"host": "127.0.0.1", "port": port, "log_level": "error"},
+        daemon=True,
+    ).start()
     _wait_for(port)
     yield f"http://127.0.0.1:{port}/mcp"
 
@@ -221,3 +226,133 @@ def test_openapi_json_sync(api_server):
             return  # already in sync
 
     root.write_text(json.dumps(live, indent=2) + "\n")
+
+
+# --- Web UI Integration Tests ---
+
+
+def test_web_login_page_renders(api_server):
+    resp = httpx.get(f"{api_server}/web/login")
+    assert resp.status_code == 200
+    assert "Login" in resp.text
+
+
+def test_web_login_success(api_server):
+    resp = httpx.post(
+        f"{api_server}/web/login",
+        data={"access_token": "admin-token"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/web/"
+    assert "obs_token" in resp.headers.get("set-cookie", "")
+
+
+def test_web_login_invalid_token(api_server):
+    resp = httpx.post(
+        f"{api_server}/web/login",
+        data={"access_token": "bad-token"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 200
+    assert "Invalid token" in resp.text
+
+
+def test_web_logout(api_server):
+    resp = httpx.post(
+        f"{api_server}/web/logout",
+        cookies={"obs_token": "admin-token"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/web/login"
+    set_cookie = resp.headers.get("set-cookie", "")
+    assert "obs_token" in set_cookie
+    assert 'Max-Age=0' in set_cookie
+    assert 'path=/web' in set_cookie.lower()
+
+
+def test_web_unauthenticated_redirect(api_server):
+    resp = httpx.get(f"{api_server}/web/", follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/web/login"
+
+
+def test_web_home_page(api_server, vault):
+    resp = httpx.get(
+        f"{api_server}/web/",
+        cookies={"obs_token": "admin-token"},
+    )
+    assert resp.status_code == 200
+    assert vault.vault_path.name in resp.text
+    assert "admin" in resp.text
+
+
+def test_web_config_page(api_server):
+    resp = httpx.get(
+        f"{api_server}/web/config",
+        cookies={"obs_token": "admin-token"},
+    )
+    assert resp.status_code == 200
+    assert "vault_path" in resp.text
+    assert "address" in resp.text
+    assert "port" in resp.text
+    assert "fqdn" in resp.text
+    assert "base_path" in resp.text
+    assert "Server Config" in resp.text
+
+
+def test_web_users_page(api_server):
+    resp = httpx.get(
+        f"{api_server}/web/users",
+        cookies={"obs_token": "admin-token"},
+    )
+    assert resp.status_code == 200
+    assert "reader" in resp.text
+    assert "Users" in resp.text
+
+
+def test_web_add_user(api_server):
+    resp = httpx.post(
+        f"{api_server}/web/users/add",
+        data={"username": "newuser", "access_token": "new-token"},
+        cookies={"obs_token": "admin-token"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/web/users"
+
+    # Verify user appears in users list
+    resp = httpx.get(
+        f"{api_server}/web/users",
+        cookies={"obs_token": "admin-token"},
+    )
+    assert "newuser" in resp.text
+
+
+def test_web_edit_user(api_server):
+    resp = httpx.post(
+        f"{api_server}/web/users/reader",
+        data={"username": "reader", "access_token": "reader-token", "is_admin": "true"},
+        cookies={"obs_token": "admin-token"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/web/users"
+
+
+def test_web_delete_user(api_server):
+    resp = httpx.post(
+        f"{api_server}/web/users/reader/delete",
+        cookies={"obs_token": "admin-token"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/web/users"
+
+    # Verify user is gone from users list
+    resp = httpx.get(
+        f"{api_server}/web/users",
+        cookies={"obs_token": "admin-token"},
+    )
+    assert "reader" not in resp.text

@@ -1,0 +1,149 @@
+from __future__ import annotations
+
+from html import escape as _h
+
+from .models import (
+    AddUserPage,
+    ConfigPage,
+    HomePage,
+    LoginPage,
+    User,
+    UserPage,
+    UsersPage,
+)
+
+
+def _layout(title: str, body: str, username: str | None = None, base_path: str = "") -> str:
+    bp = _h(base_path)
+    nav = ""
+    if username:
+        nav = (
+            f'<a href="{bp}/web/">Home</a> '
+            f'<a href="{bp}/web/config">Config</a> '
+            f'<a href="{bp}/web/users">Users</a> '
+            f'<span style="float:right"><b>{_h(username)}</b> '
+            f'<form method="post" action="{bp}/web/logout" style="display:inline">'
+            f'<button type="submit">Logout</button></form></span>'
+        )
+    else:
+        nav = f'<a href="{bp}/web/login">Login</a>'
+    return f"""<!DOCTYPE html>
+<html><head><title>{_h(title)}</title>
+<style>
+body{{font-family:system-ui,sans-serif;max-width:720px;margin:2em auto;padding:0 1em;background:#2b2b2b;color:#e0e0e0}}
+nav{{border-bottom:1px solid #555;padding:.5em 0;margin-bottom:1.5em}}
+a{{margin-right:1em;color:#ccc}}
+input[type=text],input[type=password]{{width:100%;box-sizing:border-box;padding:.3em;background:#3a3a3a;color:#e0e0e0;border:1px solid #555}}
+table{{border-collapse:collapse;width:100%}}
+th,td{{text-align:left;padding:.3em .5em;border-bottom:1px solid #555}}
+button,input[type=submit]{{padding:.3em .8em;cursor:pointer;background:#444;color:#e0e0e0;border:1px solid #555}}
+.error{{color:#f88}}
+.hint{{color:#888;font-size:.85em}}
+</style></head><body>
+<nav>{nav}</nav>
+<h1>{_h(title)}</h1>
+{body}
+</body></html>"""
+
+
+def render_login(page: LoginPage, base_path: str = "") -> str:
+    bp = _h(base_path)
+    error = f'<p class="error">{_h(page.login_error)}</p>' if page.login_error else ""
+    body = f"""{error}
+<form method="post" action="{bp}/web/login">
+<p><label>Access Token<br><input type="password" name="access_token" autofocus></label></p>
+<p><button type="submit">Login</button></p>
+</form>"""
+    return _layout("Login", body, base_path=base_path)
+
+
+def render_home(page: HomePage, base_path: str = "") -> str:
+    bp = _h(base_path)
+    error = f'<p class="error">{_h(page.server_error)}</p>' if page.server_error else ""
+    body = f"""{error}
+<p>Vault: <b>{_h(page.vault_name)}</b></p>
+<p>Web: <a href="{_h(page.web_fqdn)}">{_h(page.web_fqdn)}</a></p>
+<p>API: <a href="{_h(page.api_fqdn)}">{_h(page.api_fqdn)}</a></p>
+<p>MCP: <a href="{_h(page.mcp_fqdn)}">{_h(page.mcp_fqdn)}</a></p>
+<p>User: <a href="{bp}/web/users/{_h(page.username)}">{_h(page.username)}</a></p>
+<p class="hint">Authenticate via <code>Authorization: Bearer <token></code> header.</p>"""
+    return _layout("Obsidian AI Mini Server", body, page.username, base_path)
+
+
+def render_config(page: ConfigPage, base_path: str = "") -> str:
+    bp = _h(base_path)
+    c = page.config
+    body = f"""<table>
+<tr><td>vault_path</td><td>{_h(c.vault_path)}</td></tr>
+<tr><td>address</td><td>{_h(c.address)}</td></tr>
+<tr><td>port</td><td>{c.port}</td></tr>
+<tr><td>fqdn</td><td>{_h(c.fqdn)}</td></tr>
+<tr><td>base_path</td><td>{_h(c.base_path)}</td></tr>
+</table>
+<p><a href="{bp}/web/users">{len(c.users)} Users</a></p>"""
+    return _layout("Server Config", body, "admin", base_path)
+
+
+def render_users(page: UsersPage, base_path: str = "") -> str:
+    bp = _h(base_path)
+    rows = ""
+    for u in page.users:
+        admin = " ✓" if u.is_admin else ""
+        rows += f'<tr><td><a href="{bp}/web/users/{_h(u.username)}">{_h(u.username)}</a></td><td>{admin}</td></tr>\n'
+    body = f"""<table>
+<tr><th>Username</th><th>Admin</th></tr>
+{rows}</table>
+<p><a href="{bp}/web/users/add">Add User</a></p>"""
+    return _layout("Users", body, "admin", base_path)
+
+
+def _user_form(user: User, action: str, is_new: bool, user_index: int) -> str:
+    admin_ck = "checked" if user.is_admin else ""
+
+    access_rows = ""
+    for i, ac in enumerate(user.access):
+        rec_ck = "checked" if ac.recursive else ""
+        rd_ck = "checked" if ac.read else ""
+        wr_ck = "checked" if ac.write else ""
+        access_rows += f"""<tr>
+<td><input type="text" name="access_path" value="{_h(ac.path)}"></td>
+<td><input type="checkbox" name="access_recursive" {rec_ck}></td>
+<td><input type="checkbox" name="access_read" {rd_ck}></td>
+<td><input type="checkbox" name="access_write" {wr_ck}></td>
+<td><button type="submit" name="delete_access" value="{i}" onclick="return confirm('Delete this access rule?')">Delete</button></td>
+</tr>\n"""
+
+    delete_btn = ""
+    if not is_new and user_index != 0:
+        delete_btn = '<button type="submit" name="delete_user" value="1" onclick="return confirm(\'Delete this user?\')">Delete User</button>'
+
+    body = f"""<form method="post" action="{action}">
+<p><label>Username<br><input type="text" name="username" value="{_h(user.username)}"></label></p>
+<p><label>Access Token<br>
+<input type="password" name="access_token" id="tok" value="" placeholder="Enter new token or leave blank to keep current">
+<button type="button" onclick="var t=document.getElementById('tok');t.type=t.type==='password'?'text':'password'">Show</button>
+</label><span class="hint"> Leave blank to keep current token.</span></p>
+<p><label><input type="checkbox" name="is_admin" {admin_ck}> Admin</label></p>
+<h2>Access</h2>
+<table>
+<tr><th>Path</th><th>Recursive</th><th>Read</th><th>Write</th><th></th></tr>
+{access_rows}</table>
+<p><button type="submit" name="add_access" value="1">Add Access</button></p>
+<p>
+<button type="submit" name="save" value="1">Save Changes</button>
+{delete_btn}
+</p>
+</form>"""
+    return body
+
+
+def render_user(page: UserPage, user: User, user_index: int, base_path: str = "") -> str:
+    bp = _h(base_path)
+    body = _user_form(user, f"{bp}/web/users/{_h(user.username)}", False, user_index)
+    return _layout(f"User: {user.username}", body, "admin", base_path)
+
+
+def render_add_user(page: AddUserPage, user: User, base_path: str = "") -> str:
+    bp = _h(base_path)
+    body = _user_form(user, f"{bp}/web/users/add", True, -1)
+    return _layout("Add User", body, "admin", base_path)

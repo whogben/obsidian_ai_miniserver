@@ -4,11 +4,34 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-05-07
+
+### Changed
+
+- Combined server architecture: single port serves `/api`, `/web`, and `/mcp`
+- New CLI args: `--port`, `--fqdn`, `--base_path` (replacing `--openapi-port` and `--mcp-port`)
+- ServerConfig simplified to: `address`, `port`, `fqdn`, `base_path`
+
+### Added
+
+- Web UI admin interface at `/web/`
+  - Login/logout with cookie-based auth
+  - Home page with vault info
+  - Config page showing server settings
+  - Users page listing all users
+  - User edit page with access rule management
+  - Add user page
+- New file: `src/obs_ai_ms/webui.py` — HTML rendering via fstrings
+- Web routes mounted in `entry.py` under `/web/`
+- Screenshot generation via `scripts/update_screenshots.py`
+- README updated with screenshots from `docs/images/`
+- `docs/images/` directory for committed screenshots
+
 ## [0.2.1] - 2026-05-07
 
 ### Added
 
-- Environment variable support for all CLI options (`OBS_AI_MS_HOST`, `OBS_AI_MS_OPENAPI_PORT`, `OBS_AI_MS_MCP_PORT`)
+- Environment variable support for all CLI options (`OBS_AI_MS_HOST`, `OBS_AI_MS_PORT`)
 - Self-contained `docker-compose.yaml` for headless deployment with Obsidian Headless sync CLI
 - Headless deployment section in README
 

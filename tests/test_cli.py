@@ -28,7 +28,7 @@ def test_cli_server_starts_and_stays_alive(tmp_path):
     proc = subprocess.Popen(
         [
             sys.executable, "-m", "obs_ai_ms.entry", "start", str(vault),
-            "--admin-token", "test123", "--mcp-port", "-1", "--openapi-port", "0",
+            "--admin-token", "test123", "--port", "0",
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -51,7 +51,7 @@ def test_cli_env_var_admin_token(tmp_path):
 
     proc = subprocess.Popen(
         [sys.executable, "-m", "obs_ai_ms.entry", "start", str(vault),
-         "--mcp-port", "-1", "--openapi-port", "0"],
+         "--port", "0"],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
     )
     try:
@@ -62,34 +62,15 @@ def test_cli_env_var_admin_token(tmp_path):
         proc.wait(timeout=5)
 
 
-def test_cli_env_var_openapi_port(tmp_path):
-    """OBS_AI_MS_OPENAPI_PORT env var supplies openapi port without --openapi-port flag."""
+def test_cli_env_var_port(tmp_path):
+    """OBS_AI_MS_PORT env var supplies port without --port flag."""
     vault = tmp_path / "vault"
     vault.mkdir()
-    env = {**os.environ, "OBS_AI_MS_OPENAPI_PORT": "0"}
+    env = {**os.environ, "OBS_AI_MS_PORT": "0"}
 
     proc = subprocess.Popen(
         [sys.executable, "-m", "obs_ai_ms.entry", "start", str(vault),
-         "--admin-token", "test123", "--mcp-port", "-1"],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
-    )
-    try:
-        time.sleep(3)
-        assert proc.poll() is None, f"Server crashed:\n{proc.stderr.read().decode()}"
-    finally:
-        proc.terminate()
-        proc.wait(timeout=5)
-
-
-def test_cli_env_var_mcp_port(tmp_path):
-    """OBS_AI_MS_MCP_PORT env var supplies mcp port without --mcp-port flag."""
-    vault = tmp_path / "vault"
-    vault.mkdir()
-    env = {**os.environ, "OBS_AI_MS_MCP_PORT": "-1"}
-
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "obs_ai_ms.entry", "start", str(vault),
-         "--admin-token", "test123", "--openapi-port", "0"],
+         "--admin-token", "test123"],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
     )
     try:
@@ -108,7 +89,7 @@ def test_cli_env_var_host(tmp_path):
 
     proc = subprocess.Popen(
         [sys.executable, "-m", "obs_ai_ms.entry", "start", str(vault),
-         "--admin-token", "test123", "--mcp-port", "-1", "--openapi-port", "0"],
+         "--admin-token", "test123", "--port", "0"],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
     )
     try:

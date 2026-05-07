@@ -80,6 +80,23 @@ def check_tests() -> bool:
     return False
 
 
+def check_screenshots() -> bool:
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "update_screenshots.py")],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        print("  ✓ Screenshots up to date")
+        return True
+    print("  ✗ Screenshots update failed")
+    if result.stderr:
+        for line in result.stderr.splitlines()[-5:]:
+            print(f"    {line}")
+    return False
+
+
 def check_git_clean() -> bool:
     result = subprocess.run(
         ["git", "status", "--porcelain"],
@@ -114,6 +131,7 @@ def run_checks(token: str | None) -> tuple[bool, str | None]:
     results.append(check_version(version))
     results.append(check_changelog(version))
     results.append(check_tests())
+    results.append(check_screenshots())
     results.append(check_git_clean())
     tok = check_token(token)
     results.append(tok is not None)
