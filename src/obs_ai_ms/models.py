@@ -5,28 +5,59 @@ from typing import Annotated, Literal, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 
+TOOL_PROMPT = """\
+Access one or more Obsidian vaults.
+Send a JSON array string: '[{{"kind":"get_vault_info"}}, ...]'
+
+Request kinds:
+{request_kinds}
+"""
+
+
 class ServerConfig(BaseModel):
-    vault_path: str = Field(...)
     address: str = Field(default="127.0.0.1")
     port: int = Field(default=8747)
     fqdn: str = Field(default="")
     base_path: str = Field(default="")  # path before /web, /api, /mcp, etc
+    obs_username: str = Field(default="")
+    obs_password: str = Field(default="")
+    # write-only: masked to "********" in API/UI responses when non-empty
     users: list[User] = Field(default_factory=lambda: [User()])
-    # first user is admin and cant be removed
+    # first user is admin and can be modified by env vars / cli args
+    vaults: list[VaultConfig] = Field(default_factory=list)
+    # first vault is default and can be modified by env vars / cli args
 
 
 class User(BaseModel):
     username: str = Field(default="admin")
     token: str = Field(default="")
     access: list[PathAccess] = Field(default_factory=lambda: [PathAccess()])
+
+    # "*:path/" grants access to path in all vaults
     is_admin: bool = Field(default=True)
 
 
 class PathAccess(BaseModel):
-    path: str = Field(default="/")
+    path: str = Field(default="*:")
+    # "*:" grants all access
+    # "*:something/" grants access to "something/" in all vaults
     read: bool = Field(default=True)
     write: bool = Field(default=True)
     recursive: bool = Field(default=True)
+
+
+class VaultConfig(BaseModel):
+    name: str = Field(...)
+    # defaults to vault's dir name
+    # used with any path to be vault-aware as
+    # "name:some/path/to/note.md"
+    dir_path: str = Field(...)
+    daily_notes_folder: str = Field(default="")
+    status: str = Field(default="")
+    # - "ok"
+    # - "unavailable - not configured"
+    # - "unavailable - missing dir <dir_path>"
+    # - "unavailable - dir not a vault <dir_path>"
 
 
 class BaseRequest(BaseModel):
@@ -34,14 +65,14 @@ class BaseRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class GetVaultInfo(BaseRequest):
-    """Vault and your user access."""
+class GetVaultsInfo(BaseRequest):
+    """Your vaults and access."""
 
     kind: Literal["get_vault_info"] = "get_vault_info"
 
 
 class ReadText(BaseRequest):
-    """Notes or other text files."""
+    """Notes and text files."""
 
     kind: Literal["read_text"] = "read_text"
     path: str = Field(...)
@@ -50,7 +81,7 @@ class ReadText(BaseRequest):
 
 
 class ReplaceText(BaseRequest):
-    """Replace 1 or more."""
+    """Replace 1+."""
 
     kind: Literal["replace_text"] = "replace_text"
     path: str = Field(...)
@@ -60,7 +91,7 @@ class ReplaceText(BaseRequest):
 
 
 class WriteText(BaseRequest):
-    """Overwrite with new text, creates intermediate dirs."""
+    """Overwrite."""
 
     kind: Literal["write_text"] = "write_text"
     path: str = Field(...)
@@ -68,15 +99,18 @@ class WriteText(BaseRequest):
 
 
 class AppendText(BaseRequest):
-    """Direct append, you handle newlines."""
+    """Newlines up to you."""
 
     kind: Literal["append_text"] = "append_text"
     path: str = Field(...)
     text: str = Field(...)
+    prepend: bool = Field(default=False)
 
 
 class MoveFile(BaseRequest):
-    """Moves, copies, or deletes."""
+    """Move, copy, or delete."""
+
+    # Able to move files between vaults
 
     kind: Literal["move_file"] = "move_file"
     old_path: str = Field(...)
@@ -102,7 +136,7 @@ class ListFiles(BaseRequest):
 
 class SearchFiles(BaseRequest):
     """
-    Regex filenames and text contents, returns:
+    Regex names and content, returns:
     `<path>:<line> | <match> | <context>`
     """
 
@@ -123,14 +157,27 @@ class AdminListUsers(BaseRequest):
 
 
 class AdminUpsertUser(BaseRequest):
-    """Creates, updates or deletes."""
+    """Create, update or delete."""
 
     kind: Literal["upsert_user"] = "upsert_user"
     username: str = Field(...)
     token: str | None = Field(default=None)
     access: list[PathAccess] | None = Field(default=None)
     is_admin: bool | None = Field(default=None)
-    delete_user: bool | None = Field(default=None)
+    delete: bool | None = Field(default=None)
+
+
+# class AdminListVaults(BaseRequest):
+# Deliberately omitted, just use GetVaultsInfo instead
+
+
+class AdminUpsertVault(BaseRequest):
+    """Create, update or delete."""
+
+    kind: Literal["upsert_vault"] = "upsert_vault"
+    name: str = Field(...)
+    dir_path: str = Field(...)
+    delete: bool | None = Field(default=None)
 
 
 class BaseResponse(BaseModel):
@@ -152,13 +199,18 @@ class Error(BaseResponse):
     message: str = Field(...)
 
 
-class VaultInfo(BaseResponse):
-    """Name, path to daily notes."""
+class VaultsInfo(BaseResponse):
+    """Accessible vaults and user info."""
 
     kind: Literal["vault_info"] = "vault_info"
-    name: str = Field(...)
-    daily_notes_folder: str = Field(default="")
+    vaults: list[VaultConfig] = Field(...)
     user: User = Field(...)
+
+    message: str = Field(default="")
+    # If user has access to 2+ vaults, includes:
+    # "Paths accept "vault:path", "*:" or "" = all.""
+    # If user is admin and sync is active, appends:
+    # "obs active: <latest single log line>" (only if line is < 30 seconds old)
 
 
 class FileText(BaseResponse):
@@ -181,8 +233,7 @@ class FilesList(BaseResponse):
     """
 
     kind: Literal["files_list"] = "files_list"
-    base_path: str = Field(default="")
-    results: list[str] = Field(
+    results: dict[str, list[str]] = Field(  # key by vault name
         ...
     )  # Format: `<path> | <modified_at> | <length> <chars or b>`
     length: int = Field(...)
@@ -194,7 +245,9 @@ class SearchResults(BaseResponse):
     """Regex search results with context snippets."""
 
     kind: Literal["search_results"] = "search_results"
-    results: list[str] = Field(...)  # Format: `<path>:<line> | <match> | <context>`
+    results: dict[str, list[str]] = Field(  # key by vault name
+        ...
+    )  # Format: `<path>:<line> | <match> | <context>`
     length: int = Field(...)
     offset: int = Field(default=0)
     limit: int = Field(default=50)
@@ -212,7 +265,7 @@ class UsersList(BaseResponse):
 
 ServerRequest = Annotated[
     Union[
-        GetVaultInfo,
+        GetVaultsInfo,
         ReadText,
         ReplaceText,
         WriteText,
@@ -222,6 +275,7 @@ ServerRequest = Annotated[
         SearchFiles,
         AdminListUsers,
         AdminUpsertUser,
+        AdminUpsertVault,
     ],
     Field(discriminator="kind"),
 ]
@@ -230,7 +284,7 @@ ServerResponse = Annotated[
     Union[
         Success,
         Error,
-        VaultInfo,
+        VaultsInfo,
         FileText,
         FilesList,
         SearchResults,
@@ -269,17 +323,18 @@ class HomePage(BasePage):
     """
     path: /
     title: Obsidian AI Mini Server
-    - label: vault_name
+    - list: vaults (name + status)
     - label: server_error (when present)
     - labels: web_fqdn, api_fqdn, mcp_fqdn
     - paragraph: show the header auth setup and any other key setup details
     - link: username -> /users/<username>
     - link: "Users" -> /users
+    - link: "Vaults" -> /vaults
     - link: "Config" -> /config
     - button: "Logout" (logs out the current user)
     """
 
-    vault_name: str
+    vaults: list[VaultConfig]
     username: str
     web_fqdn: str
     api_fqdn: str
@@ -292,11 +347,19 @@ class ConfigPage(BasePage):
     path: /config
     title: Server Config
     - label: server_config
-    - labels: vault_path, address, port, base_path
+    - labels: address, port, base_path, obs_username
+    - secret field: obs_password (write-only, shown as "••••••" if set, editable)
+    - link: "<vault_count> Vaults" -> /vaults
     - link: "<user_count> Users" -> /users
+    - if sync_active:
+        - section: "Obsidian Sync Log"
+        - <pre> block: last 50 lines from sync log
+        - checkbox: "Auto-refresh (1s)" — reloads page every second when checked
     """
 
     config: ServerConfig
+    sync_log: list[str] = Field(default_factory=list)
+    sync_active: bool = Field(default=False)
 
 
 class UsersPage(BasePage):
@@ -336,6 +399,8 @@ class UserPage(BasePage):
     not be modified on save.
     """
 
+    user: User
+
 
 class AddUserPage(UserPage):
     """
@@ -346,3 +411,40 @@ class AddUserPage(UserPage):
     """
 
     autogenerated_token: str
+
+
+class VaultsPage(BasePage):
+    """
+    path: /vaults
+    title: Vaults
+    - list: "Vaults"
+        - link: "<vault_name>" -> /vaults/<vault_name>
+        - label: "<status>"
+    - link: "Add Vault" -> /vaults/add
+    """
+
+    vaults: list[VaultConfig]
+
+
+class VaultPage(BasePage):
+    """
+    path: /vaults/<vault_name>
+    title: "Vault: <vault_name>"
+    - text field: name
+    - text field: dir_path
+        - hint: "Prefix with sync: to auto-sync from Obsidian — final dir name must match the vault name on Obsidian, e.g. sync:/vaults/MyNotes"
+    - label: "<status>"
+    - label: "Daily Notes at <daily_notes_folder>"
+    - button: "Save Changes" (disabled if no changes yet)
+    - button: "Delete Vault" (with confirmation)
+    """
+
+    vault: VaultConfig
+
+
+class AddVaultPage(VaultPage):
+    """
+    path: /vaults/add
+    title: Add Vault
+    Equivalent to VaultPage, but before it has a name and url.
+    """
