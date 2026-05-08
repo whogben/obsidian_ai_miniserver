@@ -35,13 +35,13 @@ class BaseRequest(BaseModel):
 
 
 class GetVaultInfo(BaseRequest):
-    """About the vault and your access."""
+    """Vault and your user access."""
 
     kind: Literal["get_vault_info"] = "get_vault_info"
 
 
 class ReadText(BaseRequest):
-    """Read path text."""
+    """Notes or other text files."""
 
     kind: Literal["read_text"] = "read_text"
     path: str = Field(...)
@@ -50,7 +50,7 @@ class ReadText(BaseRequest):
 
 
 class ReplaceText(BaseRequest):
-    """Replace 1 or more instances of `old_text` with `new_text`."""
+    """Replace 1 or more."""
 
     kind: Literal["replace_text"] = "replace_text"
     path: str = Field(...)
@@ -60,7 +60,7 @@ class ReplaceText(BaseRequest):
 
 
 class WriteText(BaseRequest):
-    """Overwrite the path with the text."""
+    """Overwrite with new text, creates intermediate dirs."""
 
     kind: Literal["write_text"] = "write_text"
     path: str = Field(...)
@@ -68,7 +68,7 @@ class WriteText(BaseRequest):
 
 
 class AppendText(BaseRequest):
-    """Append text to the end of the path."""
+    """Direct append, you handle newlines."""
 
     kind: Literal["append_text"] = "append_text"
     path: str = Field(...)
@@ -76,24 +76,24 @@ class AppendText(BaseRequest):
 
 
 class MoveFile(BaseRequest):
-    """Moves, copies, or removes the file at `old_path`."""
+    """Moves, copies, or deletes."""
 
     kind: Literal["move_file"] = "move_file"
     old_path: str = Field(...)
-    new_path: str = Field(..., description="Set to '' to delete the file.")
-    make_copy: bool = Field(default=False, description="Set to true to copy the file.")
+    new_path: str | None = Field(default=None, description="Omit to delete.")
+    make_copy: bool = Field(default=False, description="Keeps original.")
 
 
 class ListFiles(BaseRequest):
     """
-    Lists files and folders at path.
-    Returns relative file paths with their modified time and length.
+    Folder tree, returns:
+    `<path> | <modified_at> | <length>`
     """
 
     kind: Literal["list_files"] = "list_files"
     path: str = Field(default="")
     extensions: list[str] = Field(
-        default=[".md"], description="Empty list maches all files."
+        default=[".md"], description="Empty list matches all files."
     )
     max_depth: int = Field(default=1, description="-1 for infinite depth.")
     offset: int = Field(default=0)
@@ -104,8 +104,8 @@ class ListFiles(BaseRequest):
 
 class SearchFiles(BaseRequest):
     """
-    Regex notes & text files and receive matches as
-    <path>:<line> | <match> | <context>
+    Regex filenames and text contents, returns:
+    `<path>:<line> | <match> | <context>`
     """
 
     kind: Literal["search_files"] = "search_files"
@@ -119,13 +119,13 @@ class SearchFiles(BaseRequest):
 
 
 class AdminListUsers(BaseRequest):
-    """List all users."""
+    """"""
 
     kind: Literal["list_users"] = "list_users"
 
 
 class AdminUpsertUser(BaseRequest):
-    """Upsert a user."""
+    """Creates, updates or deletes."""
 
     kind: Literal["upsert_user"] = "upsert_user"
     username: str = Field(...)
@@ -133,13 +133,6 @@ class AdminUpsertUser(BaseRequest):
     access: list[PathAccess] | None = Field(default=None)
     is_admin: bool | None = Field(default=None)
     delete_user: bool | None = Field(default=None)
-
-
-class Batch(BaseRequest):
-    """Send multiple requests, get multiple responses."""
-
-    kind: Literal["batch"] = "batch"
-    requests: list[ServerRequest] = Field(...)
 
 
 class BaseResponse(BaseModel):
@@ -159,13 +152,6 @@ class Error(BaseResponse):
 
     kind: Literal["error"] = "error"
     message: str = Field(...)
-
-
-class BatchResponse(BaseResponse):
-    """Responses for a batch of requests."""
-
-    kind: Literal["batch_response"] = "batch_response"
-    responses: list[ServerResponse] = Field(...)
 
 
 class VaultInfo(BaseResponse):
@@ -223,6 +209,7 @@ class UsersList(BaseResponse):
 
 
 # AI please keep these unions up to date w/ the current models.
+# Endpoint accepts list[ServerRequest] and returns list[ServerResponse].
 # (this is the only part of this file you can edit without asking)
 
 ServerRequest = Annotated[
@@ -237,7 +224,6 @@ ServerRequest = Annotated[
         SearchFiles,
         AdminListUsers,
         AdminUpsertUser,
-        Batch,
     ],
     Field(discriminator="kind"),
 ]
@@ -251,10 +237,18 @@ ServerResponse = Annotated[
         FilesList,
         SearchResults,
         UsersList,
-        BatchResponse,
     ],
     Field(discriminator="kind"),
 ]
+
+
+class ObsidianBody(BaseModel):
+    """Body for the obsidian API endpoint."""
+
+    requests: str = Field(
+        ...,
+        description='JSON array of request objects, e.g. \'[{"kind":"get_vault_info"}]\'',
+    )
 
 
 class BasePage(BaseModel):
