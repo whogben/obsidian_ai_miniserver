@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 import warnings
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
@@ -7,7 +8,7 @@ from pathlib import Path
 
 import typer
 import uvicorn
-from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastmcp import FastMCP
@@ -82,6 +83,67 @@ def _parse_access(form) -> list[PathAccess]:
 _bearer = HTTPBearer(auto_error=False)
 
 
+def _clean_schemas(schemas: dict[str, dict]):
+    """Strip redundant noise from a dict of Pydantic-generated JSON schemas.
+
+    Works for both OpenAPI (components.schemas) and MCP ($defs).
+    """
+    for schema in schemas.values():
+        props = schema.get("properties")
+        if not props:
+            continue
+        for prop in props.values():
+            prop.pop("title", None)
+            if "const" in prop:
+                prop.pop("default", None)
+                prop.pop("type", None)
+            elif "enum" in prop:
+                prop.pop("type", None)
+        schema.pop("additionalProperties", None)
+
+
+def _clean_schema(spec: dict) -> dict:
+    """Strip redundant noise from Pydantic-generated OpenAPI schemas."""
+    import json
+
+    _clean_schemas(spec.get("components", {}).get("schemas", {}))
+
+    # Deduplicate inline oneOf+discriminator blocks into named schemas
+    schemas = spec.get("components", {}).get("schemas", {})
+
+    def _find_oneofs(obj):
+        """Yield every inline oneOf+discriminator block."""
+        if isinstance(obj, dict):
+            if "oneOf" in obj and "discriminator" in obj:
+                yield obj
+            for v in obj.values():
+                yield from _find_oneofs(v)
+        elif isinstance(obj, list):
+            for v in obj:
+                yield from _find_oneofs(v)
+
+    for block in _find_oneofs(spec):
+        block["oneOf"].sort(key=lambda r: r.get("$ref", ""))
+        block.pop("title", None)
+
+    groups: dict[str, list[dict]] = {}
+    for block in _find_oneofs(spec):
+        key = json.dumps(block, sort_keys=True)
+        groups.setdefault(key, []).append(block)
+
+    for occurrences in groups.values():
+        if len(occurrences) < 2:
+            continue
+        refs = [r["$ref"].rsplit("/", 1)[-1] for r in occurrences[0]["oneOf"]]
+        name = f"Union_{'_'.join(sorted(refs))}"
+        schemas[name] = occurrences[0].copy()
+        for block in occurrences:
+            block.clear()
+            block["$ref"] = f"#/components/schemas/{name}"
+
+    return spec
+
+
 class _WebRedirect(Exception):
     """Raised by _web_user dependency to redirect unauthenticated requests."""
     def __init__(self, url: str):
@@ -104,42 +166,37 @@ def create_api(vault: Vault, config: ServerConfig | None = None, lifespan=None) 
         lifespan=lifespan,
     )
 
-    @api.exception_handler(_WebRedirect)
-    async def _redirect_handler(request, exc):
-        return RedirectResponse(exc.url, status_code=303)
-
-    _DESC = (
-        "Access the Obsidian vault. The request body is a JSON object with a **kind** "
-        "field that determines the operation and its parameters:\n\n"
-        "- **get_vault_info** — `{\"kind\":\"get_vault_info\"}` — Returns vault name, daily-notes folder, and user info.\n"
-        "- **read_text** — `{\"kind\":\"read_text\",\"path\":\"...\",\"offset\":0,\"limit\":20000}` — Read file content. `limit: -1` for unlimited.\n"
-        "- **write_text** — `{\"kind\":\"write_text\",\"path\":\"...\",\"text\":\"...\"}` — Overwrite file with text.\n"
-        "- **append_text** — `{\"kind\":\"append_text\",\"path\":\"...\",\"text\":\"...\"}` — Append text to file.\n"
-        "- **replace_text** — `{\"kind\":\"replace_text\",\"path\":\"...\",\"old_text\":\"...\",\"new_text\":\"...\",\"count\":1}` — Replace text. `count: -1` for all occurrences.\n"
-        "- **move_file** — `{\"kind\":\"move_file\",\"old_path\":\"...\",\"new_path\":\"...\",\"make_copy\":false}` — Move, copy, or delete a file. Set `new_path: \"\"` to delete.\n"
-        "- **list_files** — `{\"kind\":\"list_files\",\"path\":\"\",\"extensions\":[\".md\"],\"max_depth\":1,\"offset\":0,\"limit\":100,\"sort_by\":\"name\",\"sort_order\":\"asc\"}` — List files and folders. `max_depth: -1` or `limit: -1` for unlimited.\n"
-        "- **list_users** — `{\"kind\":\"list_users\"}` — List all users (admin only).\n"
-        "- **upsert_user** — `{\"kind\":\"upsert_user\",\"username\":\"...\",\"token\":null,\"access\":null,\"is_admin\":null,\"delete_user\":null}` — Create, update, or delete a user (admin only).\n"
-    )
+    # Strip redundant noise from the generated schema
+    _orig_openapi = api.openapi
+    def openapi():
+        if api.openapi_schema:
+            return api.openapi_schema
+        api.openapi_schema = _clean_schema(_orig_openapi())
+        return api.openapi_schema
+    api.openapi = openapi
 
     @api.post(
         "/api/obsidian",
         response_model=ServerResponse,
         summary="Obsidian Vault Tool",
-        description=_DESC,
     )
     def obsidian(
-        request: str = Query(..., description=_DESC),
+        request: ServerRequest,
         credentials: HTTPAuthorizationCredentials = Depends(_bearer),
     ) -> ServerResponse:
-        parsed = TypeAdapter(ServerRequest).validate_json(request)
         token = credentials.credentials if credentials else None
         user = _authenticate(vault, token)
         if not user:
             raise HTTPException(status_code=401, detail="Invalid token")
-        return vault.obsidian(parsed, user)
+        return vault.obsidian(request, user)
 
-    # --- Web UI ---
+    # --- Web UI (mounted as sub-app so routes are excluded from /api/openapi.json) ---
+
+    web = FastAPI(openapi_url=None, docs_url=None, redoc_url=None)
+
+    @web.exception_handler(_WebRedirect)
+    async def _redirect_handler(request, exc):
+        return RedirectResponse(exc.url, status_code=303)
 
     def _web_user(
         obs_token: str | None = Cookie(default=None),
@@ -153,13 +210,13 @@ def create_api(vault: Vault, config: ServerConfig | None = None, lifespan=None) 
             raise HTTPException(status_code=403, detail="Admin access required")
         return user
 
-    @api.get("/web/login", response_class=HTMLResponse)
+    @web.get("/login", response_class=HTMLResponse)
     def web_login(request: Request):
         if _authenticate(vault, request.cookies.get("obs_token")):
             return RedirectResponse("/web/", status_code=303)
         return HTMLResponse(render_login(LoginPage(), base_path=config.base_path))
 
-    @api.post("/web/login")
+    @web.post("/login")
     async def web_login_post(request: Request):
         form = await request.form()
         access_token = form.get("access_token", "")
@@ -170,13 +227,13 @@ def create_api(vault: Vault, config: ServerConfig | None = None, lifespan=None) 
         resp.set_cookie("obs_token", access_token, httponly=True, samesite="strict", path="/web", secure=config.fqdn.startswith("https"))
         return resp
 
-    @api.post("/web/logout")
+    @web.post("/logout")
     def web_logout():
         resp = RedirectResponse("/web/login", status_code=303)
         resp.delete_cookie("obs_token", path="/web")
         return resp
 
-    @api.get("/web/", response_class=HTMLResponse)
+    @web.get("/", response_class=HTMLResponse)
     def web_home(user: User = Depends(_web_user)):
         fqdn = config.fqdn or f"http://{config.address}:{config.port}"
         bp = config.base_path
@@ -188,20 +245,25 @@ def create_api(vault: Vault, config: ServerConfig | None = None, lifespan=None) 
             mcp_fqdn=f"{fqdn}{bp}/mcp",
         ), base_path=config.base_path))
 
-    @api.get("/web/config", response_class=HTMLResponse)
+    @web.get("/config", response_class=HTMLResponse)
     def web_config(user: User = Depends(_web_user)):
         page_config = config.model_copy(update={"users": list(vault.users)})
         return HTMLResponse(render_config(ConfigPage(config=page_config), base_path=config.base_path))
 
-    @api.get("/web/users", response_class=HTMLResponse)
+    @web.get("/users", response_class=HTMLResponse)
     def web_users(user: User = Depends(_web_user)):
         return HTMLResponse(render_users(UsersPage(users=vault.users), base_path=config.base_path))
 
-    @api.get("/web/users/add", response_class=HTMLResponse)
+    @web.get("/users/add", response_class=HTMLResponse)
     def web_user_add_form(user: User = Depends(_web_user)):
-        return HTMLResponse(render_add_user(AddUserPage(), User(), base_path=config.base_path))
+        autogenerated_token = secrets.token_urlsafe(16)
+        return HTMLResponse(render_add_user(
+            AddUserPage(autogenerated_token=autogenerated_token),
+            User(token=autogenerated_token),
+            base_path=config.base_path,
+        ))
 
-    @api.post("/web/users/add")
+    @web.post("/users/add")
     async def web_user_add_post(request: Request, auth_user: User = Depends(_web_user)):
         form = await request.form()
         vault.obsidian(AdminUpsertUser(
@@ -212,14 +274,14 @@ def create_api(vault: Vault, config: ServerConfig | None = None, lifespan=None) 
         ), auth_user)
         return RedirectResponse("/web/users", status_code=303)
 
-    @api.get("/web/users/{username}", response_class=HTMLResponse)
+    @web.get("/users/{username}", response_class=HTMLResponse)
     def web_user_page(username: str, user: User = Depends(_web_user)):
         for i, u in enumerate(vault.users):
             if u.username == username:
                 return HTMLResponse(render_user(UserPage(), u, i, base_path=config.base_path))
         return RedirectResponse("/web/users", status_code=303)
 
-    @api.post("/web/users/{username}")
+    @web.post("/users/{username}")
     async def web_user_save(request: Request, username: str, auth_user: User = Depends(_web_user)):
         form = await request.form()
 
@@ -227,7 +289,7 @@ def create_api(vault: Vault, config: ServerConfig | None = None, lifespan=None) 
         if "add_access" in form or "delete_access" in form:
             form_user = User(
                 username=form.get("username", username),
-                token=form.get("access_token", ""),
+                token="",
                 is_admin="is_admin" in form,
                 access=_parse_access(form),
             )
@@ -250,11 +312,12 @@ def create_api(vault: Vault, config: ServerConfig | None = None, lifespan=None) 
         ), auth_user)
         return RedirectResponse("/web/users", status_code=303)
 
-    @api.post("/web/users/{username}/delete")
+    @web.post("/users/{username}/delete")
     def web_user_delete(username: str, auth_user: User = Depends(_web_user)):
         vault.obsidian(AdminUpsertUser(username=username, delete_user=True), auth_user)
         return RedirectResponse("/web/users", status_code=303)
 
+    api.mount("/web", web)
     return api
 
 
@@ -262,8 +325,10 @@ def create_api(vault: Vault, config: ServerConfig | None = None, lifespan=None) 
 
 
 def _server_request_schema() -> dict:
-    """Generate the JSON Schema for ServerRequest (the full discriminated union)."""
-    return TypeAdapter(ServerRequest).json_schema()
+    """Generate the cleaned JSON Schema for ServerRequest (the full discriminated union)."""
+    schema = TypeAdapter(ServerRequest).json_schema()
+    _clean_schemas(schema.get("$defs", {}))
+    return schema
 
 
 def create_mcp(vault: Vault) -> FastMCP:
@@ -271,12 +336,7 @@ def create_mcp(vault: Vault) -> FastMCP:
 
     @mcp.tool()
     def obsidian(request: str) -> str:
-        """Access the Obsidian vault.
-
-        Accepts a request with a 'kind' field that determines the operation.
-        Supported kinds: get_vault_info, read_text, write_text, append_text,
-        replace_text, move_file, list_files, list_users, upsert_user.
-        """
+        """Access the Obsidian vault."""
         parsed = TypeAdapter(ServerRequest).validate_json(request)
         try:
             auth = get_http_request().headers.get("authorization", "")
@@ -348,6 +408,9 @@ def start(
     api = create_api(vault, config, lifespan=lifespan)
     api.mount("/mcp", mcp_asgi)
 
+    bp = config.base_path
+    typer.echo(f"Web UI: http://{host}:{port}{bp}/web/")
+    typer.echo(f"API docs: http://{host}:{port}{bp}/api/docs")
     uvicorn.run(api, host=host, port=port)
 
 

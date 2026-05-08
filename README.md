@@ -1,6 +1,10 @@
 # obsidian-ai-miniserver
 
+A complete Obsidian tool in ~1,776 tokens!
+
 Makes your Obsidian vault accessible via REST API (OpenAPI) and a streamable HTTP MCP server. Enables AI to find, read, and edit text notes. Supports multiple users with token-based auth and path-level access control.
+
+Browse the API on [Redocly](https://redocly.github.io/redoc/?url=https://raw.githubusercontent.com/whogben/obsidian_ai_miniserver/main/openapi.json) or [Swagger](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/whogben/obsidian_ai_miniserver/main/openapi.json).
 
 <img src="https://raw.githubusercontent.com/whogben/obsidian_ai_miniserver/main/docs/images/screenshot_home.png" alt="Home page showing admin user" width="600">
 
@@ -32,11 +36,11 @@ Makes your Obsidian vault accessible via REST API (OpenAPI) and a streamable HTT
 
 <img src="https://raw.githubusercontent.com/whogben/obsidian_ai_miniserver/main/docs/images/screenshot_user.png" alt="User detail with access rules" width="500">
 
-### Less tokens = less cost, faster
+### Maximum Token Efficiency = Faster and Cheaper
 - Maximally powerful requests to minimize request and param counts
-- Batch request
-- Limits, Paging, Sort on all requests, AI can adjust snippet sizes on search results, etc
-- Minimized docstrings, zero duplication or boilerplate
+- The entire tool schema uses ~1,776 tokens thanks to minimized docstrings, zero duplication or boilerplate
+- Batch request enables multiple LLM actions in one iteration, massively improving token efficiency
+- Limits, Paging, Sort on all requests, AI can adjust snippet sizes on search results, etc — no more tokens than it needs
 
 ## Quick start
 
@@ -92,8 +96,6 @@ OBSIDIAN_USERNAME=you@example.com OBSIDIAN_PASSWORD=secret OBSIDIAN_VAULTNAME="M
 ```
 
 ## API reference
-
-See [`openapi.json`](https://github.com/whogben/obsidian_ai_miniserver/blob/main/openapi.json) for full request/response definitions.
 
 All requests go to `POST /api/obsidian` with a `kind` field that discriminates the request type. Available kinds:
 

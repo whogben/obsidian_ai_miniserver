@@ -111,7 +111,7 @@ def mcp_server(vault):
 def test_api_get_vault_info(api_server):
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        params={"request": '{"kind": "get_vault_info"}'},
+        json={"kind": "get_vault_info"},
         headers={"Authorization": "Bearer admin-token"},
     )
     assert resp.status_code == 200
@@ -125,7 +125,7 @@ def test_api_read_write(api_server):
     # Write
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        params={"request": '{"kind": "write_text", "path": "new.md", "text": "integration test"}'},
+        json={"kind": "write_text", "path": "new.md", "text": "integration test"},
         headers={"Authorization": "Bearer admin-token"},
     )
     assert resp.status_code == 200
@@ -134,7 +134,7 @@ def test_api_read_write(api_server):
     # Read back
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        params={"request": '{"kind": "read_text", "path": "new.md"}'},
+        json={"kind": "read_text", "path": "new.md"},
         headers={"Authorization": "Bearer admin-token"},
     )
     assert resp.status_code == 200
@@ -147,14 +147,14 @@ def test_api_unauthorized(api_server):
     # Missing token
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        params={"request": '{"kind": "get_vault_info"}'},
+        json={"kind": "get_vault_info"},
     )
     assert resp.status_code == 401
 
     # Bad token
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        params={"request": '{"kind": "get_vault_info"}'},
+        json={"kind": "get_vault_info"},
         headers={"Authorization": "Bearer bad-token"},
     )
     assert resp.status_code == 401
@@ -164,7 +164,7 @@ def test_api_access_denied(api_server):
     # Reader can't read outside allowed path
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        params={"request": '{"kind": "read_text", "path": "readme.md"}'},
+        json={"kind": "read_text", "path": "readme.md"},
         headers={"Authorization": "Bearer reader-token"},
     )
     assert resp.status_code == 200
@@ -175,7 +175,7 @@ def test_api_access_denied(api_server):
     # Reader can't write
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        params={"request": '{"kind": "write_text", "path": "notes/test.md", "text": "hacked"}'},
+        json={"kind": "write_text", "path": "notes/test.md", "text": "hacked"},
         headers={"Authorization": "Bearer reader-token"},
     )
     assert resp.status_code == 200
@@ -219,6 +219,10 @@ def test_openapi_json_sync(api_server):
     assert resp.status_code == 200
     live = resp.json()
 
+    # Web routes must not appear in the API schema (would confuse AI tool consumers)
+    for path in live.get("paths", {}):
+        assert not path.startswith("/web/"), f"Web route {path} leaked into API openapi.json"
+
     root = Path(__file__).resolve().parent.parent / "openapi.json"
     if root.exists():
         stored = json.loads(root.read_text())
@@ -226,6 +230,29 @@ def test_openapi_json_sync(api_server):
             return  # already in sync
 
     root.write_text(json.dumps(live, indent=2) + "\n")
+
+
+def test_readme_token_count():
+    """The ~X,XXX tokens in README is counted via tiktoken on the MCP tool schema."""
+    import re
+
+    import tiktoken
+
+    from obs_ai_ms.entry import _server_request_schema
+
+    schema_str = json.dumps(_server_request_schema())
+    tokens = len(tiktoken.encoding_for_model("gpt-4o").encode(schema_str))
+    expected = f"~{tokens:,} tokens"
+
+    root = Path(__file__).resolve().parent.parent
+    readme_path = root / "README.md"
+    readme = readme_path.read_text()
+    matches = re.findall(r"~[\d,]+ tokens", readme)
+    assert matches, "No token count pattern found in README"
+
+    if expected not in readme:
+        readme = re.sub(r"~[\d,]+ tokens", expected, readme)
+        readme_path.write_text(readme)
 
 
 # --- Web UI Integration Tests ---

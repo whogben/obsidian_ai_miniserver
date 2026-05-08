@@ -9,580 +9,169 @@
     "/api/obsidian": {
       "post": {
         "summary": "Obsidian Vault Tool",
-        "description": "Access the Obsidian vault. The request body is a JSON object with a **kind** field that determines the operation and its parameters:\n\n- **get_vault_info** \u2014 `{\"kind\":\"get_vault_info\"}` \u2014 Returns vault name, daily-notes folder, and user info.\n- **read_text** \u2014 `{\"kind\":\"read_text\",\"path\":\"...\",\"offset\":0,\"limit\":20000}` \u2014 Read file content. `limit: -1` for unlimited.\n- **write_text** \u2014 `{\"kind\":\"write_text\",\"path\":\"...\",\"text\":\"...\"}` \u2014 Overwrite file with text.\n- **append_text** \u2014 `{\"kind\":\"append_text\",\"path\":\"...\",\"text\":\"...\"}` \u2014 Append text to file.\n- **replace_text** \u2014 `{\"kind\":\"replace_text\",\"path\":\"...\",\"old_text\":\"...\",\"new_text\":\"...\",\"count\":1}` \u2014 Replace text. `count: -1` for all occurrences.\n- **move_file** \u2014 `{\"kind\":\"move_file\",\"old_path\":\"...\",\"new_path\":\"...\",\"make_copy\":false}` \u2014 Move, copy, or delete a file. Set `new_path: \"\"` to delete.\n- **list_files** \u2014 `{\"kind\":\"list_files\",\"path\":\"\",\"extensions\":[\".md\"],\"max_depth\":1,\"offset\":0,\"limit\":100,\"sort_by\":\"name\",\"sort_order\":\"asc\"}` \u2014 List files and folders. `max_depth: -1` or `limit: -1` for unlimited.\n- **list_users** \u2014 `{\"kind\":\"list_users\"}` \u2014 List all users (admin only).\n- **upsert_user** \u2014 `{\"kind\":\"upsert_user\",\"username\":\"...\",\"token\":null,\"access\":null,\"is_admin\":null,\"delete_user\":null}` \u2014 Create, update, or delete a user (admin only).",
         "operationId": "obsidian_api_obsidian_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Union_AdminListUsers_AdminUpsertUser_AppendText_Batch_GetVaultInfo_ListFiles_MoveFile_ReadText_ReplaceText_SearchFiles_WriteText"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Union_BatchResponse_Error_FileText_FilesList_SearchResults_Success_UsersList_VaultInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
         "security": [
           {
             "HTTPBearer": []
           }
-        ],
-        "parameters": [
-          {
-            "name": "request",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Access the Obsidian vault. The request body is a JSON object with a **kind** field that determines the operation and its parameters:\n\n- **get_vault_info** \u2014 `{\"kind\":\"get_vault_info\"}` \u2014 Returns vault name, daily-notes folder, and user info.\n- **read_text** \u2014 `{\"kind\":\"read_text\",\"path\":\"...\",\"offset\":0,\"limit\":20000}` \u2014 Read file content. `limit: -1` for unlimited.\n- **write_text** \u2014 `{\"kind\":\"write_text\",\"path\":\"...\",\"text\":\"...\"}` \u2014 Overwrite file with text.\n- **append_text** \u2014 `{\"kind\":\"append_text\",\"path\":\"...\",\"text\":\"...\"}` \u2014 Append text to file.\n- **replace_text** \u2014 `{\"kind\":\"replace_text\",\"path\":\"...\",\"old_text\":\"...\",\"new_text\":\"...\",\"count\":1}` \u2014 Replace text. `count: -1` for all occurrences.\n- **move_file** \u2014 `{\"kind\":\"move_file\",\"old_path\":\"...\",\"new_path\":\"...\",\"make_copy\":false}` \u2014 Move, copy, or delete a file. Set `new_path: \"\"` to delete.\n- **list_files** \u2014 `{\"kind\":\"list_files\",\"path\":\"\",\"extensions\":[\".md\"],\"max_depth\":1,\"offset\":0,\"limit\":100,\"sort_by\":\"name\",\"sort_order\":\"asc\"}` \u2014 List files and folders. `max_depth: -1` or `limit: -1` for unlimited.\n- **list_users** \u2014 `{\"kind\":\"list_users\"}` \u2014 List all users (admin only).\n- **upsert_user** \u2014 `{\"kind\":\"upsert_user\",\"username\":\"...\",\"token\":null,\"access\":null,\"is_admin\":null,\"delete_user\":null}` \u2014 Create, update, or delete a user (admin only).\n",
-              "title": "Request"
-            },
-            "description": "Access the Obsidian vault. The request body is a JSON object with a **kind** field that determines the operation and its parameters:\n\n- **get_vault_info** \u2014 `{\"kind\":\"get_vault_info\"}` \u2014 Returns vault name, daily-notes folder, and user info.\n- **read_text** \u2014 `{\"kind\":\"read_text\",\"path\":\"...\",\"offset\":0,\"limit\":20000}` \u2014 Read file content. `limit: -1` for unlimited.\n- **write_text** \u2014 `{\"kind\":\"write_text\",\"path\":\"...\",\"text\":\"...\"}` \u2014 Overwrite file with text.\n- **append_text** \u2014 `{\"kind\":\"append_text\",\"path\":\"...\",\"text\":\"...\"}` \u2014 Append text to file.\n- **replace_text** \u2014 `{\"kind\":\"replace_text\",\"path\":\"...\",\"old_text\":\"...\",\"new_text\":\"...\",\"count\":1}` \u2014 Replace text. `count: -1` for all occurrences.\n- **move_file** \u2014 `{\"kind\":\"move_file\",\"old_path\":\"...\",\"new_path\":\"...\",\"make_copy\":false}` \u2014 Move, copy, or delete a file. Set `new_path: \"\"` to delete.\n- **list_files** \u2014 `{\"kind\":\"list_files\",\"path\":\"\",\"extensions\":[\".md\"],\"max_depth\":1,\"offset\":0,\"limit\":100,\"sort_by\":\"name\",\"sort_order\":\"asc\"}` \u2014 List files and folders. `max_depth: -1` or `limit: -1` for unlimited.\n- **list_users** \u2014 `{\"kind\":\"list_users\"}` \u2014 List all users (admin only).\n- **upsert_user** \u2014 `{\"kind\":\"upsert_user\",\"username\":\"...\",\"token\":null,\"access\":null,\"is_admin\":null,\"delete_user\":null}` \u2014 Create, update, or delete a user (admin only).\n"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/Success"
-                    },
-                    {
-                      "$ref": "#/components/schemas/Error"
-                    },
-                    {
-                      "$ref": "#/components/schemas/VaultInfo"
-                    },
-                    {
-                      "$ref": "#/components/schemas/FileText"
-                    },
-                    {
-                      "$ref": "#/components/schemas/FilesList"
-                    },
-                    {
-                      "$ref": "#/components/schemas/SearchResults"
-                    },
-                    {
-                      "$ref": "#/components/schemas/UsersList"
-                    },
-                    {
-                      "$ref": "#/components/schemas/BatchResponse"
-                    }
-                  ],
-                  "discriminator": {
-                    "propertyName": "kind",
-                    "mapping": {
-                      "success": "#/components/schemas/Success",
-                      "error": "#/components/schemas/Error",
-                      "vault_info": "#/components/schemas/VaultInfo",
-                      "file_text": "#/components/schemas/FileText",
-                      "files_list": "#/components/schemas/FilesList",
-                      "search_results": "#/components/schemas/SearchResults",
-                      "users_list": "#/components/schemas/UsersList",
-                      "batch_response": "#/components/schemas/BatchResponse"
-                    }
-                  },
-                  "title": "Response Obsidian Api Obsidian Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/web/login": {
-      "get": {
-        "summary": "Web Login",
-        "operationId": "web_login_web_login_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "text/html": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Web Login Post",
-        "operationId": "web_login_post_web_login_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/web/logout": {
-      "post": {
-        "summary": "Web Logout",
-        "operationId": "web_logout_web_logout_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/web/": {
-      "get": {
-        "summary": "Web Home",
-        "operationId": "web_home_web__get",
-        "parameters": [
-          {
-            "name": "obs_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Obs Token"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "text/html": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/web/config": {
-      "get": {
-        "summary": "Web Config",
-        "operationId": "web_config_web_config_get",
-        "parameters": [
-          {
-            "name": "obs_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Obs Token"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "text/html": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/web/users": {
-      "get": {
-        "summary": "Web Users",
-        "operationId": "web_users_web_users_get",
-        "parameters": [
-          {
-            "name": "obs_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Obs Token"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "text/html": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/web/users/add": {
-      "get": {
-        "summary": "Web User Add Form",
-        "operationId": "web_user_add_form_web_users_add_get",
-        "parameters": [
-          {
-            "name": "obs_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Obs Token"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "text/html": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Web User Add Post",
-        "operationId": "web_user_add_post_web_users_add_post",
-        "parameters": [
-          {
-            "name": "obs_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Obs Token"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/web/users/{username}": {
-      "get": {
-        "summary": "Web User Page",
-        "operationId": "web_user_page_web_users__username__get",
-        "parameters": [
-          {
-            "name": "username",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Username"
-            }
-          },
-          {
-            "name": "obs_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Obs Token"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "text/html": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Web User Save",
-        "operationId": "web_user_save_web_users__username__post",
-        "parameters": [
-          {
-            "name": "username",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Username"
-            }
-          },
-          {
-            "name": "obs_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Obs Token"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/web/users/{username}/delete": {
-      "post": {
-        "summary": "Web User Delete",
-        "operationId": "web_user_delete_web_users__username__delete_post",
-        "parameters": [
-          {
-            "name": "username",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Username"
-            }
-          },
-          {
-            "name": "obs_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Obs Token"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
+        ]
       }
     }
   },
   "components": {
     "schemas": {
+      "AdminListUsers": {
+        "properties": {
+          "kind": {
+            "const": "list_users"
+          }
+        },
+        "type": "object",
+        "title": "AdminListUsers",
+        "description": "List all users."
+      },
+      "AdminUpsertUser": {
+        "properties": {
+          "kind": {
+            "const": "upsert_user"
+          },
+          "username": {
+            "type": "string"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "access": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PathAccess"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "is_admin": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "delete_user": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "username"
+        ],
+        "title": "AdminUpsertUser",
+        "description": "Upsert a user."
+      },
+      "AppendText": {
+        "properties": {
+          "kind": {
+            "const": "append_text"
+          },
+          "path": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "text"
+        ],
+        "title": "AppendText",
+        "description": "Append text to the end of the path."
+      },
+      "Batch": {
+        "properties": {
+          "kind": {
+            "const": "batch"
+          },
+          "requests": {
+            "items": {
+              "$ref": "#/components/schemas/Union_AdminListUsers_AdminUpsertUser_AppendText_Batch_GetVaultInfo_ListFiles_MoveFile_ReadText_ReplaceText_SearchFiles_WriteText"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requests"
+        ],
+        "title": "Batch",
+        "description": "Send multiple requests, get multiple responses."
+      },
       "BatchResponse": {
         "properties": {
           "kind": {
-            "type": "string",
-            "const": "batch_response",
-            "title": "Kind",
-            "default": "batch_response"
+            "const": "batch_response"
           },
           "responses": {
             "items": {
-              "oneOf": [
-                {
-                  "$ref": "#/components/schemas/Success"
-                },
-                {
-                  "$ref": "#/components/schemas/Error"
-                },
-                {
-                  "$ref": "#/components/schemas/VaultInfo"
-                },
-                {
-                  "$ref": "#/components/schemas/FileText"
-                },
-                {
-                  "$ref": "#/components/schemas/FilesList"
-                },
-                {
-                  "$ref": "#/components/schemas/SearchResults"
-                },
-                {
-                  "$ref": "#/components/schemas/UsersList"
-                },
-                {
-                  "$ref": "#/components/schemas/BatchResponse"
-                }
-              ],
-              "discriminator": {
-                "propertyName": "kind",
-                "mapping": {
-                  "batch_response": "#/components/schemas/BatchResponse",
-                  "error": "#/components/schemas/Error",
-                  "file_text": "#/components/schemas/FileText",
-                  "files_list": "#/components/schemas/FilesList",
-                  "search_results": "#/components/schemas/SearchResults",
-                  "success": "#/components/schemas/Success",
-                  "users_list": "#/components/schemas/UsersList",
-                  "vault_info": "#/components/schemas/VaultInfo"
-                }
-              }
+              "$ref": "#/components/schemas/Union_BatchResponse_Error_FileText_FilesList_SearchResults_Success_UsersList_VaultInfo"
             },
-            "type": "array",
-            "title": "Responses"
+            "type": "array"
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
           "responses"
@@ -593,17 +182,12 @@
       "Error": {
         "properties": {
           "kind": {
-            "type": "string",
-            "const": "error",
-            "title": "Kind",
-            "default": "error"
+            "const": "error"
           },
           "message": {
-            "type": "string",
-            "title": "Message"
+            "type": "string"
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
           "message"
@@ -614,35 +198,26 @@
       "FileText": {
         "properties": {
           "kind": {
-            "type": "string",
-            "const": "file_text",
-            "title": "Kind",
-            "default": "file_text"
+            "const": "file_text"
           },
           "text": {
-            "type": "string",
-            "title": "Text"
+            "type": "string"
           },
           "length": {
-            "type": "integer",
-            "title": "Length"
+            "type": "integer"
           },
           "modified_at": {
-            "type": "string",
-            "title": "Modified At"
+            "type": "string"
           },
           "offset": {
             "type": "integer",
-            "title": "Offset",
             "default": 0
           },
           "limit": {
             "type": "integer",
-            "title": "Limit",
             "default": 20000
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
           "text",
@@ -655,39 +230,30 @@
       "FilesList": {
         "properties": {
           "kind": {
-            "type": "string",
-            "const": "files_list",
-            "title": "Kind",
-            "default": "files_list"
+            "const": "files_list"
           },
           "base_path": {
             "type": "string",
-            "title": "Base Path",
             "default": ""
           },
           "results": {
             "items": {
               "type": "string"
             },
-            "type": "array",
-            "title": "Results"
+            "type": "array"
           },
           "length": {
-            "type": "integer",
-            "title": "Length"
+            "type": "integer"
           },
           "offset": {
             "type": "integer",
-            "title": "Offset",
             "default": 0
           },
           "limit": {
             "type": "integer",
-            "title": "Limit",
             "default": 100
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
           "results",
@@ -696,76 +262,251 @@
         "title": "FilesList",
         "description": "List of files and folders relative to the base path.\nIf offset > 0 or length > limit, the results are an excerpt."
       },
+      "GetVaultInfo": {
+        "properties": {
+          "kind": {
+            "const": "get_vault_info"
+          }
+        },
+        "type": "object",
+        "title": "GetVaultInfo",
+        "description": "About the vault and your access."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
             "items": {
               "$ref": "#/components/schemas/ValidationError"
             },
-            "type": "array",
-            "title": "Detail"
+            "type": "array"
           }
         },
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "ListFiles": {
+        "properties": {
+          "kind": {
+            "const": "list_files"
+          },
+          "path": {
+            "type": "string",
+            "default": ""
+          },
+          "extensions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "description": "Empty list maches all files.",
+            "default": [
+              ".md"
+            ]
+          },
+          "max_depth": {
+            "type": "integer",
+            "description": "-1 for infinite depth.",
+            "default": 1
+          },
+          "offset": {
+            "type": "integer",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "description": "-1 for unlimited results.",
+            "default": 100
+          },
+          "sort_by": {
+            "enum": [
+              "name",
+              "length",
+              "modified"
+            ],
+            "default": "name"
+          },
+          "sort_order": {
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "default": "asc"
+          }
+        },
+        "type": "object",
+        "title": "ListFiles",
+        "description": "Lists files and folders at path.\nReturns relative file paths with their modified time and length."
+      },
+      "MoveFile": {
+        "properties": {
+          "kind": {
+            "const": "move_file"
+          },
+          "old_path": {
+            "type": "string"
+          },
+          "new_path": {
+            "type": "string",
+            "description": "Set to '' to delete the file."
+          },
+          "make_copy": {
+            "type": "boolean",
+            "description": "Set to true to copy the file.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "old_path",
+          "new_path"
+        ],
+        "title": "MoveFile",
+        "description": "Moves, copies, or removes the file at `old_path`."
+      },
       "PathAccess": {
         "properties": {
           "path": {
             "type": "string",
-            "title": "Path",
             "default": "/"
           },
           "read": {
             "type": "boolean",
-            "title": "Read",
             "default": true
           },
           "write": {
             "type": "boolean",
-            "title": "Write",
             "default": true
           },
           "recursive": {
             "type": "boolean",
-            "title": "Recursive",
             "default": true
           }
         },
         "type": "object",
         "title": "PathAccess"
       },
+      "ReadText": {
+        "properties": {
+          "kind": {
+            "const": "read_text"
+          },
+          "path": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "description": "-1 for unlimited chars.",
+            "default": 20000
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "ReadText",
+        "description": "Read path text."
+      },
+      "ReplaceText": {
+        "properties": {
+          "kind": {
+            "const": "replace_text"
+          },
+          "path": {
+            "type": "string"
+          },
+          "old_text": {
+            "type": "string"
+          },
+          "new_text": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "description": "Set to -1 for unlimited.",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "old_text",
+          "new_text"
+        ],
+        "title": "ReplaceText",
+        "description": "Replace 1 or more instances of `old_text` with `new_text`."
+      },
+      "SearchFiles": {
+        "properties": {
+          "kind": {
+            "const": "search_files"
+          },
+          "pattern": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "default": ""
+          },
+          "extensions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "default": [
+              ".md"
+            ]
+          },
+          "max_depth": {
+            "type": "integer",
+            "default": -1
+          },
+          "context_chars": {
+            "type": "integer",
+            "default": 120
+          },
+          "offset": {
+            "type": "integer",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "default": 100
+          }
+        },
+        "type": "object",
+        "required": [
+          "pattern"
+        ],
+        "title": "SearchFiles",
+        "description": "Regex notes & text files and receive matches as\n<path>:<line> | <match> | <context>"
+      },
       "SearchResults": {
         "properties": {
           "kind": {
-            "type": "string",
-            "const": "search_results",
-            "title": "Kind",
-            "default": "search_results"
+            "const": "search_results"
           },
           "results": {
             "items": {
               "type": "string"
             },
-            "type": "array",
-            "title": "Results"
+            "type": "array"
           },
           "length": {
-            "type": "integer",
-            "title": "Length"
+            "type": "integer"
           },
           "offset": {
             "type": "integer",
-            "title": "Offset",
             "default": 0
           },
           "limit": {
             "type": "integer",
-            "title": "Limit",
             "default": 50
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
           "results",
@@ -777,18 +518,13 @@
       "Success": {
         "properties": {
           "kind": {
-            "type": "string",
-            "const": "success",
-            "title": "Kind",
-            "default": "success"
+            "const": "success"
           },
           "message": {
             "type": "string",
-            "title": "Message",
             "default": ""
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "title": "Success",
         "description": "Default response."
@@ -797,24 +533,20 @@
         "properties": {
           "username": {
             "type": "string",
-            "title": "Username",
             "default": "admin"
           },
           "token": {
             "type": "string",
-            "title": "Token",
             "default": ""
           },
           "access": {
             "items": {
               "$ref": "#/components/schemas/PathAccess"
             },
-            "type": "array",
-            "title": "Access"
+            "type": "array"
           },
           "is_admin": {
             "type": "boolean",
-            "title": "Is Admin",
             "default": true
           }
         },
@@ -824,20 +556,15 @@
       "UsersList": {
         "properties": {
           "kind": {
-            "type": "string",
-            "const": "users_list",
-            "title": "Kind",
-            "default": "users_list"
+            "const": "users_list"
           },
           "users": {
             "items": {
               "$ref": "#/components/schemas/User"
             },
-            "type": "array",
-            "title": "Users"
+            "type": "array"
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
           "users"
@@ -857,23 +584,17 @@
                 }
               ]
             },
-            "type": "array",
-            "title": "Location"
+            "type": "array"
           },
           "msg": {
-            "type": "string",
-            "title": "Message"
+            "type": "string"
           },
           "type": {
-            "type": "string",
-            "title": "Error Type"
+            "type": "string"
           },
-          "input": {
-            "title": "Input"
-          },
+          "input": {},
           "ctx": {
-            "type": "object",
-            "title": "Context"
+            "type": "object"
           }
         },
         "type": "object",
@@ -887,25 +608,19 @@
       "VaultInfo": {
         "properties": {
           "kind": {
-            "type": "string",
-            "const": "vault_info",
-            "title": "Kind",
-            "default": "vault_info"
+            "const": "vault_info"
           },
           "name": {
-            "type": "string",
-            "title": "Name"
+            "type": "string"
           },
           "daily_notes_folder": {
             "type": "string",
-            "title": "Daily Notes Folder",
             "default": ""
           },
           "user": {
             "$ref": "#/components/schemas/User"
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
           "name",
@@ -913,6 +628,120 @@
         ],
         "title": "VaultInfo",
         "description": "Name, path to daily notes."
+      },
+      "WriteText": {
+        "properties": {
+          "kind": {
+            "const": "write_text"
+          },
+          "path": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "text"
+        ],
+        "title": "WriteText",
+        "description": "Overwrite the path with the text."
+      },
+      "Union_AdminListUsers_AdminUpsertUser_AppendText_Batch_GetVaultInfo_ListFiles_MoveFile_ReadText_ReplaceText_SearchFiles_WriteText": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AdminListUsers"
+          },
+          {
+            "$ref": "#/components/schemas/AdminUpsertUser"
+          },
+          {
+            "$ref": "#/components/schemas/AppendText"
+          },
+          {
+            "$ref": "#/components/schemas/Batch"
+          },
+          {
+            "$ref": "#/components/schemas/GetVaultInfo"
+          },
+          {
+            "$ref": "#/components/schemas/ListFiles"
+          },
+          {
+            "$ref": "#/components/schemas/MoveFile"
+          },
+          {
+            "$ref": "#/components/schemas/ReadText"
+          },
+          {
+            "$ref": "#/components/schemas/ReplaceText"
+          },
+          {
+            "$ref": "#/components/schemas/SearchFiles"
+          },
+          {
+            "$ref": "#/components/schemas/WriteText"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "get_vault_info": "#/components/schemas/GetVaultInfo",
+            "read_text": "#/components/schemas/ReadText",
+            "replace_text": "#/components/schemas/ReplaceText",
+            "write_text": "#/components/schemas/WriteText",
+            "append_text": "#/components/schemas/AppendText",
+            "move_file": "#/components/schemas/MoveFile",
+            "list_files": "#/components/schemas/ListFiles",
+            "search_files": "#/components/schemas/SearchFiles",
+            "list_users": "#/components/schemas/AdminListUsers",
+            "upsert_user": "#/components/schemas/AdminUpsertUser",
+            "batch": "#/components/schemas/Batch"
+          }
+        }
+      },
+      "Union_BatchResponse_Error_FileText_FilesList_SearchResults_Success_UsersList_VaultInfo": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BatchResponse"
+          },
+          {
+            "$ref": "#/components/schemas/Error"
+          },
+          {
+            "$ref": "#/components/schemas/FileText"
+          },
+          {
+            "$ref": "#/components/schemas/FilesList"
+          },
+          {
+            "$ref": "#/components/schemas/SearchResults"
+          },
+          {
+            "$ref": "#/components/schemas/Success"
+          },
+          {
+            "$ref": "#/components/schemas/UsersList"
+          },
+          {
+            "$ref": "#/components/schemas/VaultInfo"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "success": "#/components/schemas/Success",
+            "error": "#/components/schemas/Error",
+            "vault_info": "#/components/schemas/VaultInfo",
+            "file_text": "#/components/schemas/FileText",
+            "files_list": "#/components/schemas/FilesList",
+            "search_results": "#/components/schemas/SearchResults",
+            "users_list": "#/components/schemas/UsersList",
+            "batch_response": "#/components/schemas/BatchResponse"
+          }
+        }
       }
     },
     "securitySchemes": {
