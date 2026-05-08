@@ -111,11 +111,11 @@ def mcp_server(vault):
 def test_api_get_vault_info(api_server):
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        json={"kind": "get_vault_info"},
+        json={"requests": '[{"kind": "get_vault_info"}]'},
         headers={"Authorization": "Bearer admin-token"},
     )
     assert resp.status_code == 200
-    data = resp.json()
+    data = resp.json()[0]
     assert data["kind"] == "vault_info"
     assert data["name"]
     assert data["daily_notes_folder"] == "Dailies"
@@ -125,20 +125,20 @@ def test_api_read_write(api_server):
     # Write
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        json={"kind": "write_text", "path": "new.md", "text": "integration test"},
+        json={"requests": '[{"kind": "write_text", "path": "new.md", "text": "integration test"}]'},
         headers={"Authorization": "Bearer admin-token"},
     )
     assert resp.status_code == 200
-    assert resp.json()["kind"] == "success"
+    assert resp.json()[0]["kind"] == "success"
 
     # Read back
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        json={"kind": "read_text", "path": "new.md"},
+        json={"requests": '[{"kind": "read_text", "path": "new.md"}]'},
         headers={"Authorization": "Bearer admin-token"},
     )
     assert resp.status_code == 200
-    data = resp.json()
+    data = resp.json()[0]
     assert data["kind"] == "file_text"
     assert data["text"] == "integration test"
 
@@ -147,14 +147,14 @@ def test_api_unauthorized(api_server):
     # Missing token
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        json={"kind": "get_vault_info"},
+        json={"requests": '[{"kind": "get_vault_info"}]'},
     )
     assert resp.status_code == 401
 
     # Bad token
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        json={"kind": "get_vault_info"},
+        json={"requests": '[{"kind": "get_vault_info"}]'},
         headers={"Authorization": "Bearer bad-token"},
     )
     assert resp.status_code == 401
@@ -164,22 +164,22 @@ def test_api_access_denied(api_server):
     # Reader can't read outside allowed path
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        json={"kind": "read_text", "path": "readme.md"},
+        json={"requests": '[{"kind": "read_text", "path": "readme.md"}]'},
         headers={"Authorization": "Bearer reader-token"},
     )
     assert resp.status_code == 200
-    data = resp.json()
+    data = resp.json()[0]
     assert data["kind"] == "error"
     assert "access denied" in data["message"].lower()
 
     # Reader can't write
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        json={"kind": "write_text", "path": "notes/test.md", "text": "hacked"},
+        json={"requests": '[{"kind": "write_text", "path": "notes/test.md", "text": "hacked"}]'},
         headers={"Authorization": "Bearer reader-token"},
     )
     assert resp.status_code == 200
-    assert resp.json()["kind"] == "error"
+    assert resp.json()[0]["kind"] == "error"
 
 
 # --- MCP Integration Tests ---
@@ -199,7 +199,7 @@ def test_mcp_tool_call(mcp_server):
         async with Client(transport) as client:
             result = await client.call_tool(
                 "obsidian",
-                {"request": '{"kind": "get_vault_info"}'},
+                {"requests": '[{"kind": "get_vault_info"}]'},
             )
             return result
 
@@ -207,7 +207,7 @@ def test_mcp_tool_call(mcp_server):
     assert result.content
     text = result.content[0].text
     data = json.loads(text)
-    assert data["kind"] == "vault_info"
+    assert data[0]["kind"] == "vault_info"
 
 
 # --- OpenAPI JSON Sync ---
@@ -232,19 +232,33 @@ def test_openapi_json_sync(api_server):
     root.write_text(json.dumps(live, indent=2) + "\n")
 
 
+def test_tool_prompt_md():
+    """Keep tool_prompt.md in sync with the current tool description."""
+    from obs_ai_ms.entry import _tool_description
+
+    prompt = _tool_description()
+
+    root = Path(__file__).resolve().parent.parent
+    prompt_path = root / "tool_prompt.md"
+    if prompt_path.exists() and prompt_path.read_text() == prompt:
+        return  # already in sync
+    prompt_path.write_text(prompt)
+
+
 def test_readme_token_count():
-    """The ~X,XXX tokens in README is counted via tiktoken on the MCP tool schema."""
+    """The ~X,XXX tokens in README is counted via tiktoken on tool_prompt.md."""
     import re
 
     import tiktoken
 
-    from obs_ai_ms.entry import _server_request_schema
+    root = Path(__file__).resolve().parent.parent
+    prompt_path = root / "tool_prompt.md"
+    assert prompt_path.exists(), "Run test_tool_prompt_md first"
 
-    schema_str = json.dumps(_server_request_schema())
-    tokens = len(tiktoken.encoding_for_model("gpt-4o").encode(schema_str))
+    prompt = prompt_path.read_text()
+    tokens = len(tiktoken.encoding_for_model("gpt-4o").encode(prompt))
     expected = f"~{tokens:,} tokens"
 
-    root = Path(__file__).resolve().parent.parent
     readme_path = root / "README.md"
     readme = readme_path.read_text()
     matches = re.findall(r"~[\d,]+ tokens", readme)

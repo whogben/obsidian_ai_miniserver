@@ -12,8 +12,6 @@ from .models import (
     AdminListUsers,
     AdminUpsertUser,
     AppendText,
-    Batch,
-    BatchResponse,
     Error,
     FileText,
     FilesList,
@@ -50,7 +48,6 @@ class Vault:
             "search_files": self._search_files,
             "list_users": self._list_users,
             "upsert_user": self._upsert_user,
-            "batch": self._batch,
         }
         self._load_config()
         self._config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -105,13 +102,19 @@ class Vault:
             return True
         return False
 
-    def obsidian(self, request: ServerRequest, user: User) -> ServerResponse:
+    def obsidian(self, requests: list[ServerRequest], user: User) -> list[ServerResponse]:
+        results: list[ServerResponse] = []
+        for request in requests:
+            results.append(self._handle_one(request, user))
+        return results
+
+    def _handle_one(self, request: ServerRequest, user: User) -> ServerResponse:
         # Admin-only operations
         if request.kind in ("list_users", "upsert_user") and not user.is_admin:
             return Error(message="Access denied")
 
         # Path-based access control
-        if request.kind not in ("get_vault_info", "list_users", "upsert_user", "batch"):
+        if request.kind not in ("get_vault_info", "list_users", "upsert_user"):
             write = request.kind in ("write_text", "append_text", "replace_text", "move_file")
             if request.kind == "move_file":
                 check_paths = [request.old_path]
@@ -129,7 +132,7 @@ class Vault:
             return Error(message=f"Unsupported request: {request.kind}")
 
         try:
-            if request.kind in ("get_vault_info", "batch"):
+            if request.kind == "get_vault_info":
                 return handler(request, user)
             return handler(request)
         except ValueError:
@@ -185,7 +188,7 @@ class Vault:
         old = self._resolve(req.old_path)
         if not old.exists():
             return Error(message=f"File not found: {req.old_path}")
-        if req.new_path == "":
+        if not req.new_path:
             old.unlink()
             return Success()
         new = self._resolve(req.new_path)
@@ -291,6 +294,10 @@ class Vault:
             if child.is_dir():
                 self._search_walk(child, extensions, max_depth, depth + 1, rel, pattern, context_chars, out)
             elif child.is_file() and (not extensions or child.suffix in extensions):
+                # Match filename
+                for m in pattern.finditer(child.name):
+                    out.append(f"{rel}:0 | {m.group()} | (filename)")
+                # Match file contents
                 try:
                     for i, line in enumerate(child.read_text().splitlines(), 1):
                         for m in pattern.finditer(line):
@@ -337,7 +344,3 @@ class Vault:
         ))
         self._save_config()
         return Success(message=f"Created user '{req.username}' with token: {token}")
-
-    def _batch(self, req: Batch, user: User) -> BatchResponse:
-        responses = [self.obsidian(r, user) for r in req.requests]
-        return BatchResponse(responses=responses)

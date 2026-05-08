@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.2] - 2026-05-08
+
+### Changed
+
+- Removed `Batch` request and `BatchResponse` — batching is now implicit at the endpoint level (send `list[ServerRequest]`, get `list[ServerResponse]`)
+- `MoveFile.new_path` is now optional (`str | None`, default `None`); omit to delete instead of setting to `""`
+- Minimized all request docstrings for lower token count
+- OpenAPI schema simplified: endpoint accepts `ObsidianBody` (JSON string) and returns raw `Response`
+
 ## [0.3.1] - 2026-05-07
 
 ### Fixed
