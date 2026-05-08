@@ -56,7 +56,7 @@ class ReplaceText(BaseRequest):
     path: str = Field(...)
     old_text: str = Field(...)
     new_text: str = Field(...)
-    count: int = Field(default=1, description="Set to -1 for unlimited.")
+    count: int = Field(default=1, description="-1 for unlimited.")
 
 
 class WriteText(BaseRequest):
@@ -92,10 +92,8 @@ class ListFiles(BaseRequest):
 
     kind: Literal["list_files"] = "list_files"
     path: str = Field(default="")
-    extensions: list[str] = Field(
-        default=[".md"], description="Empty list matches all files."
-    )
-    max_depth: int = Field(default=1, description="-1 for infinite depth.")
+    extensions: list[str] = Field(default=[".md"], description="Empty matches all.")
+    max_depth: int = Field(default=1, description="-1 for unlimited.")
     offset: int = Field(default=0)
     limit: int = Field(default=100, description="-1 for unlimited results.")
     sort_by: Literal["name", "length", "modified"] = Field(default="name")
