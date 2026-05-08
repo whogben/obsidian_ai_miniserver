@@ -9,12 +9,13 @@
     "/api/obsidian": {
       "post": {
         "summary": "Obsidian Vault Tool",
+        "description": "Access the Obsidian vault. Send a JSON array string: '[{\"kind\":\"get_vault_info\"}, ...]'\n\nRequest kinds:\n- get_vault_info: Vault and your user access.\n- read_text(path, offset=0, limit=20000 \"-1 for unlimited chars.\"): Notes or other text files.\n- replace_text(path, old_text, new_text, count=1 \"Set to -1 for unlimited.\"): Replace 1 or more.\n- write_text(path, text): Overwrite with new text, creates intermediate dirs.\n- append_text(path, text): Direct append, you handle newlines.\n- move_file(old_path, new_path=None \"Omit to delete.\", make_copy=false \"Keeps original.\"): Moves, copies, or deletes.\n- list_files(path=\"\", extensions=[\".md\"] \"Empty list matches all files.\", max_depth=1 \"-1 for infinite depth.\", offset=0, limit=100 \"-1 for unlimited results.\", sort_by=\"name\" [name|length|modified], sort_order=\"asc\" [asc|desc]): Folder tree, returns: `<path> | <modified_at> | <length>`\n- search_files(pattern, path=\"\", extensions=[\".md\"], max_depth=-1, context_chars=120, offset=0, limit=100): Regex filenames and text contents, returns: `<path>:<line> | <match> | <context>`\n- list_users: \n- upsert_user(username, token=None, access=None, is_admin=None, delete_user=None): Creates, updates or deletes.",
         "operationId": "obsidian_api_obsidian_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Union_AdminListUsers_AdminUpsertUser_AppendText_Batch_GetVaultInfo_ListFiles_MoveFile_ReadText_ReplaceText_SearchFiles_WriteText"
+                "$ref": "#/components/schemas/ObsidianBody"
               }
             }
           },
@@ -25,9 +26,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Union_BatchResponse_Error_FileText_FilesList_SearchResults_Success_UsersList_VaultInfo"
-                }
+                "schema": {}
               }
             }
           },
@@ -52,524 +51,33 @@
   },
   "components": {
     "schemas": {
-      "AdminListUsers": {
-        "properties": {
-          "kind": {
-            "const": "list_users"
-          }
-        },
-        "type": "object",
-        "title": "AdminListUsers",
-        "description": "List all users."
-      },
-      "AdminUpsertUser": {
-        "properties": {
-          "kind": {
-            "const": "upsert_user"
-          },
-          "username": {
-            "type": "string"
-          },
-          "token": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "access": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PathAccess"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "is_admin": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "delete_user": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "username"
-        ],
-        "title": "AdminUpsertUser",
-        "description": "Upsert a user."
-      },
-      "AppendText": {
-        "properties": {
-          "kind": {
-            "const": "append_text"
-          },
-          "path": {
-            "type": "string"
-          },
-          "text": {
-            "type": "string"
-          }
-        },
-        "type": "object",
-        "required": [
-          "path",
-          "text"
-        ],
-        "title": "AppendText",
-        "description": "Append text to the end of the path."
-      },
-      "Batch": {
-        "properties": {
-          "kind": {
-            "const": "batch"
-          },
-          "requests": {
-            "items": {
-              "$ref": "#/components/schemas/Union_AdminListUsers_AdminUpsertUser_AppendText_Batch_GetVaultInfo_ListFiles_MoveFile_ReadText_ReplaceText_SearchFiles_WriteText"
-            },
-            "type": "array"
-          }
-        },
-        "type": "object",
-        "required": [
-          "requests"
-        ],
-        "title": "Batch",
-        "description": "Send multiple requests, get multiple responses."
-      },
-      "BatchResponse": {
-        "properties": {
-          "kind": {
-            "const": "batch_response"
-          },
-          "responses": {
-            "items": {
-              "$ref": "#/components/schemas/Union_BatchResponse_Error_FileText_FilesList_SearchResults_Success_UsersList_VaultInfo"
-            },
-            "type": "array"
-          }
-        },
-        "type": "object",
-        "required": [
-          "responses"
-        ],
-        "title": "BatchResponse",
-        "description": "Responses for a batch of requests."
-      },
-      "Error": {
-        "properties": {
-          "kind": {
-            "const": "error"
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "title": "Error",
-        "description": "Request failed."
-      },
-      "FileText": {
-        "properties": {
-          "kind": {
-            "const": "file_text"
-          },
-          "text": {
-            "type": "string"
-          },
-          "length": {
-            "type": "integer"
-          },
-          "modified_at": {
-            "type": "string"
-          },
-          "offset": {
-            "type": "integer",
-            "default": 0
-          },
-          "limit": {
-            "type": "integer",
-            "default": 20000
-          }
-        },
-        "type": "object",
-        "required": [
-          "text",
-          "length",
-          "modified_at"
-        ],
-        "title": "FileText",
-        "description": "If offset > 0 or length > limit, the text is an excerpt."
-      },
-      "FilesList": {
-        "properties": {
-          "kind": {
-            "const": "files_list"
-          },
-          "base_path": {
-            "type": "string",
-            "default": ""
-          },
-          "results": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "length": {
-            "type": "integer"
-          },
-          "offset": {
-            "type": "integer",
-            "default": 0
-          },
-          "limit": {
-            "type": "integer",
-            "default": 100
-          }
-        },
-        "type": "object",
-        "required": [
-          "results",
-          "length"
-        ],
-        "title": "FilesList",
-        "description": "List of files and folders relative to the base path.\nIf offset > 0 or length > limit, the results are an excerpt."
-      },
-      "GetVaultInfo": {
-        "properties": {
-          "kind": {
-            "const": "get_vault_info"
-          }
-        },
-        "type": "object",
-        "title": "GetVaultInfo",
-        "description": "About the vault and your access."
-      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
             "items": {
               "$ref": "#/components/schemas/ValidationError"
             },
-            "type": "array"
+            "type": "array",
+            "title": "Detail"
           }
         },
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "ListFiles": {
+      "ObsidianBody": {
         "properties": {
-          "kind": {
-            "const": "list_files"
-          },
-          "path": {
+          "requests": {
             "type": "string",
-            "default": ""
-          },
-          "extensions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "description": "Empty list maches all files.",
-            "default": [
-              ".md"
-            ]
-          },
-          "max_depth": {
-            "type": "integer",
-            "description": "-1 for infinite depth.",
-            "default": 1
-          },
-          "offset": {
-            "type": "integer",
-            "default": 0
-          },
-          "limit": {
-            "type": "integer",
-            "description": "-1 for unlimited results.",
-            "default": 100
-          },
-          "sort_by": {
-            "enum": [
-              "name",
-              "length",
-              "modified"
-            ],
-            "default": "name"
-          },
-          "sort_order": {
-            "enum": [
-              "asc",
-              "desc"
-            ],
-            "default": "asc"
-          }
-        },
-        "type": "object",
-        "title": "ListFiles",
-        "description": "Lists files and folders at path.\nReturns relative file paths with their modified time and length."
-      },
-      "MoveFile": {
-        "properties": {
-          "kind": {
-            "const": "move_file"
-          },
-          "old_path": {
-            "type": "string"
-          },
-          "new_path": {
-            "type": "string",
-            "description": "Set to '' to delete the file."
-          },
-          "make_copy": {
-            "type": "boolean",
-            "description": "Set to true to copy the file.",
-            "default": false
+            "title": "Requests",
+            "description": "JSON array of request objects, e.g. '[{\"kind\":\"get_vault_info\"}]'"
           }
         },
         "type": "object",
         "required": [
-          "old_path",
-          "new_path"
+          "requests"
         ],
-        "title": "MoveFile",
-        "description": "Moves, copies, or removes the file at `old_path`."
-      },
-      "PathAccess": {
-        "properties": {
-          "path": {
-            "type": "string",
-            "default": "/"
-          },
-          "read": {
-            "type": "boolean",
-            "default": true
-          },
-          "write": {
-            "type": "boolean",
-            "default": true
-          },
-          "recursive": {
-            "type": "boolean",
-            "default": true
-          }
-        },
-        "type": "object",
-        "title": "PathAccess"
-      },
-      "ReadText": {
-        "properties": {
-          "kind": {
-            "const": "read_text"
-          },
-          "path": {
-            "type": "string"
-          },
-          "offset": {
-            "type": "integer",
-            "default": 0
-          },
-          "limit": {
-            "type": "integer",
-            "description": "-1 for unlimited chars.",
-            "default": 20000
-          }
-        },
-        "type": "object",
-        "required": [
-          "path"
-        ],
-        "title": "ReadText",
-        "description": "Read path text."
-      },
-      "ReplaceText": {
-        "properties": {
-          "kind": {
-            "const": "replace_text"
-          },
-          "path": {
-            "type": "string"
-          },
-          "old_text": {
-            "type": "string"
-          },
-          "new_text": {
-            "type": "string"
-          },
-          "count": {
-            "type": "integer",
-            "description": "Set to -1 for unlimited.",
-            "default": 1
-          }
-        },
-        "type": "object",
-        "required": [
-          "path",
-          "old_text",
-          "new_text"
-        ],
-        "title": "ReplaceText",
-        "description": "Replace 1 or more instances of `old_text` with `new_text`."
-      },
-      "SearchFiles": {
-        "properties": {
-          "kind": {
-            "const": "search_files"
-          },
-          "pattern": {
-            "type": "string"
-          },
-          "path": {
-            "type": "string",
-            "default": ""
-          },
-          "extensions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "default": [
-              ".md"
-            ]
-          },
-          "max_depth": {
-            "type": "integer",
-            "default": -1
-          },
-          "context_chars": {
-            "type": "integer",
-            "default": 120
-          },
-          "offset": {
-            "type": "integer",
-            "default": 0
-          },
-          "limit": {
-            "type": "integer",
-            "default": 100
-          }
-        },
-        "type": "object",
-        "required": [
-          "pattern"
-        ],
-        "title": "SearchFiles",
-        "description": "Regex notes & text files and receive matches as\n<path>:<line> | <match> | <context>"
-      },
-      "SearchResults": {
-        "properties": {
-          "kind": {
-            "const": "search_results"
-          },
-          "results": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "length": {
-            "type": "integer"
-          },
-          "offset": {
-            "type": "integer",
-            "default": 0
-          },
-          "limit": {
-            "type": "integer",
-            "default": 50
-          }
-        },
-        "type": "object",
-        "required": [
-          "results",
-          "length"
-        ],
-        "title": "SearchResults",
-        "description": "Regex search results with context snippets."
-      },
-      "Success": {
-        "properties": {
-          "kind": {
-            "const": "success"
-          },
-          "message": {
-            "type": "string",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "title": "Success",
-        "description": "Default response."
-      },
-      "User": {
-        "properties": {
-          "username": {
-            "type": "string",
-            "default": "admin"
-          },
-          "token": {
-            "type": "string",
-            "default": ""
-          },
-          "access": {
-            "items": {
-              "$ref": "#/components/schemas/PathAccess"
-            },
-            "type": "array"
-          },
-          "is_admin": {
-            "type": "boolean",
-            "default": true
-          }
-        },
-        "type": "object",
-        "title": "User"
-      },
-      "UsersList": {
-        "properties": {
-          "kind": {
-            "const": "users_list"
-          },
-          "users": {
-            "items": {
-              "$ref": "#/components/schemas/User"
-            },
-            "type": "array"
-          }
-        },
-        "type": "object",
-        "required": [
-          "users"
-        ],
-        "title": "UsersList"
+        "title": "ObsidianBody",
+        "description": "Body for the obsidian API endpoint."
       },
       "ValidationError": {
         "properties": {
@@ -584,17 +92,23 @@
                 }
               ]
             },
-            "type": "array"
+            "type": "array",
+            "title": "Location"
           },
           "msg": {
-            "type": "string"
+            "type": "string",
+            "title": "Message"
           },
           "type": {
-            "type": "string"
+            "type": "string",
+            "title": "Error Type"
           },
-          "input": {},
+          "input": {
+            "title": "Input"
+          },
           "ctx": {
-            "type": "object"
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -604,144 +118,6 @@
           "type"
         ],
         "title": "ValidationError"
-      },
-      "VaultInfo": {
-        "properties": {
-          "kind": {
-            "const": "vault_info"
-          },
-          "name": {
-            "type": "string"
-          },
-          "daily_notes_folder": {
-            "type": "string",
-            "default": ""
-          },
-          "user": {
-            "$ref": "#/components/schemas/User"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "user"
-        ],
-        "title": "VaultInfo",
-        "description": "Name, path to daily notes."
-      },
-      "WriteText": {
-        "properties": {
-          "kind": {
-            "const": "write_text"
-          },
-          "path": {
-            "type": "string"
-          },
-          "text": {
-            "type": "string"
-          }
-        },
-        "type": "object",
-        "required": [
-          "path",
-          "text"
-        ],
-        "title": "WriteText",
-        "description": "Overwrite the path with the text."
-      },
-      "Union_AdminListUsers_AdminUpsertUser_AppendText_Batch_GetVaultInfo_ListFiles_MoveFile_ReadText_ReplaceText_SearchFiles_WriteText": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/AdminListUsers"
-          },
-          {
-            "$ref": "#/components/schemas/AdminUpsertUser"
-          },
-          {
-            "$ref": "#/components/schemas/AppendText"
-          },
-          {
-            "$ref": "#/components/schemas/Batch"
-          },
-          {
-            "$ref": "#/components/schemas/GetVaultInfo"
-          },
-          {
-            "$ref": "#/components/schemas/ListFiles"
-          },
-          {
-            "$ref": "#/components/schemas/MoveFile"
-          },
-          {
-            "$ref": "#/components/schemas/ReadText"
-          },
-          {
-            "$ref": "#/components/schemas/ReplaceText"
-          },
-          {
-            "$ref": "#/components/schemas/SearchFiles"
-          },
-          {
-            "$ref": "#/components/schemas/WriteText"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "kind",
-          "mapping": {
-            "get_vault_info": "#/components/schemas/GetVaultInfo",
-            "read_text": "#/components/schemas/ReadText",
-            "replace_text": "#/components/schemas/ReplaceText",
-            "write_text": "#/components/schemas/WriteText",
-            "append_text": "#/components/schemas/AppendText",
-            "move_file": "#/components/schemas/MoveFile",
-            "list_files": "#/components/schemas/ListFiles",
-            "search_files": "#/components/schemas/SearchFiles",
-            "list_users": "#/components/schemas/AdminListUsers",
-            "upsert_user": "#/components/schemas/AdminUpsertUser",
-            "batch": "#/components/schemas/Batch"
-          }
-        }
-      },
-      "Union_BatchResponse_Error_FileText_FilesList_SearchResults_Success_UsersList_VaultInfo": {
-        "oneOf": [
-          {
-            "$ref": "#/components/schemas/BatchResponse"
-          },
-          {
-            "$ref": "#/components/schemas/Error"
-          },
-          {
-            "$ref": "#/components/schemas/FileText"
-          },
-          {
-            "$ref": "#/components/schemas/FilesList"
-          },
-          {
-            "$ref": "#/components/schemas/SearchResults"
-          },
-          {
-            "$ref": "#/components/schemas/Success"
-          },
-          {
-            "$ref": "#/components/schemas/UsersList"
-          },
-          {
-            "$ref": "#/components/schemas/VaultInfo"
-          }
-        ],
-        "discriminator": {
-          "propertyName": "kind",
-          "mapping": {
-            "success": "#/components/schemas/Success",
-            "error": "#/components/schemas/Error",
-            "vault_info": "#/components/schemas/VaultInfo",
-            "file_text": "#/components/schemas/FileText",
-            "files_list": "#/components/schemas/FilesList",
-            "search_results": "#/components/schemas/SearchResults",
-            "users_list": "#/components/schemas/UsersList",
-            "batch_response": "#/components/schemas/BatchResponse"
-          }
-        }
       }
     },
     "securitySchemes": {

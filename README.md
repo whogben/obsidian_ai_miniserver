@@ -1,6 +1,6 @@
 # obsidian-ai-miniserver
 
-A complete Obsidian tool in ~1,776 tokens!
+A complete Obsidian tool in ~320 tokens! ([see tool_prompt.md](https://raw.githubusercontent.com/whogben/obsidian_ai_miniserver/main/tool_prompt.md))
 
 Makes your Obsidian vault accessible via REST API (OpenAPI) and a streamable HTTP MCP server. Enables AI to find, read, and edit text notes. Supports multiple users with token-based auth and path-level access control.
 
@@ -10,37 +10,29 @@ Browse the API on [Redocly](https://redocly.github.io/redoc/?url=https://raw.git
 
 ## What's good about it
 
-### Access anywhere
-- WebUI for human to manage
-- MCP http streaming for agents to use
-- OpenAPI api for agents and web-app integrations
-
-### Control Access
+### Maximum Control
+- Works for any form of text files in vault — markdown, json, etc
+- AI can do advanced regex searches
+- Limits, Paging, Sort on all requests — AI can adjust snippet sizes on search results, no more tokens than it needs
+- Every call is a batch — multiple operations in one round-trip by default saves time and tokens
 - Create multiple users with their own keys, different read/write permissions and folder access
-- Keep your personal vault, personal — while enabling agents access to specific subsets
+- Keep your personal vault personal — while enabling agents access to specific subsets
 
 <img src="https://raw.githubusercontent.com/whogben/obsidian_ai_miniserver/main/docs/images/screenshot_users.png" alt="Users list" width="500">
 
-### Highly Flexible
-- Works for any form of text files in vault, json, etc
-- AI can do advanced regex searches
-
-### Run anywhere
-- Locally on PC w/ Obsidian app
-- Headless in container — With ob sync or just from folder
-
-### Ruthless minimalism
-- Single CLI command
-- Single tool interface for AI
-- AI able to perform all admin work, once AI connects it can take over setup for you
+### Maximum Flexibility
+- **Access anywhere** — WebUI for humans, MCP http streaming for agents, OpenAPI for integrations
+- **Run anywhere** — Locally with Obsidian app, headless in container, with Obsidian Sync or just from folder
+- **Compatibility built-in** — Agent harness dropping rich parameter schemas? We collapse the schema into the function docstring and accept a plain JSON string
 
 <img src="https://raw.githubusercontent.com/whogben/obsidian_ai_miniserver/main/docs/images/screenshot_user.png" alt="User detail with access rules" width="500">
 
 ### Maximum Token Efficiency = Faster and Cheaper
+- Single CLI command, single tool interface for AI
+- AI can perform all admin work — once connected, it takes over setup for you
 - Maximally powerful requests to minimize request and param counts
-- The entire tool schema uses ~1,776 tokens thanks to minimized docstrings, zero duplication or boilerplate
-- Batch request enables multiple LLM actions in one iteration, massively improving token efficiency
-- Limits, Paging, Sort on all requests, AI can adjust snippet sizes on search results, etc — no more tokens than it needs
+- The entire tool schema uses ~320 tokens thanks to minimized docstrings, zero duplication or boilerplate — see [tool_prompt.md](https://raw.githubusercontent.com/whogben/obsidian_ai_miniserver/main/tool_prompt.md)
+- ~50% token savings vs raw FastMCP generated schemas with no information loss
 
 ## Quick start
 
@@ -97,7 +89,7 @@ OBSIDIAN_USERNAME=you@example.com OBSIDIAN_PASSWORD=secret OBSIDIAN_VAULTNAME="M
 
 ## API reference
 
-All requests go to `POST /api/obsidian` with a `kind` field that discriminates the request type. Available kinds:
+All requests go to `POST /api/obsidian` as a JSON array of request objects, each with a `kind` field that discriminates the request type. Available kinds:
 
 - `get_vault_info` — vault name, daily notes folder, your user info
 - `list_files` — list files and folders at a path
@@ -107,5 +99,4 @@ All requests go to `POST /api/obsidian` with a `kind` field that discriminates t
 - `replace_text` — find and replace text in a note
 - `move_file` — move, copy, or delete a file
 - `search_files` — regex search across notes and text files with context snippets
-- `batch` — send multiple requests in one call
 - `list_users` / `upsert_user` — admin user management
