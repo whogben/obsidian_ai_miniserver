@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.4.0
+
+- **Multi-vault support**: Serve multiple Obsidian vaults from one server
+  - `--vault name:path` repeatable CLI option to register vaults
+  - Vault-aware path format: `vaultname:path` in all requests
+  - Wildcard paths (`*:` or empty) operate across all vaults
+  - Cross-vault file moves
+  - Combined, sorted, paginated results across vaults
+- **Central config**: Config stored in platform app support dir (not inside vault)
+  - `--config` flag to override config file location
+  - First run generates admin token and prints to stdout
+- **Web UI vault management**: New /vaults, /vaults/add, /vaults/<name> pages
+- **Admin API for vaults**: New `upsert_vault` request kind
+- **Breaking changes**:
+  - CLI: positional vault_path removed, use `--vault name:path`
+  - API: `get_vault_info` → `get_vault_info` (response shape changed)
+  - API: `files_list` and `search_results` now keyed by vault name
+  - Config format completely changed (no migration from v0.3.x)
+
 ## [0.3.3] - 2026-05-08
 
 ### Changed

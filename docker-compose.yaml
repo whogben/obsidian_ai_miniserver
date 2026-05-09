@@ -2,9 +2,8 @@ services:
   obsidian-ai-miniserver:
     image: python:3.11-slim
     environment:
-      - OBSIDIAN_USERNAME=${OBSIDIAN_USERNAME}
-      - OBSIDIAN_PASSWORD=${OBSIDIAN_PASSWORD}
-      - OBSIDIAN_VAULTNAME=${OBSIDIAN_VAULTNAME}
+      - OBS_AI_MS_OBS_USERNAME=${OBSIDIAN_USERNAME}
+      - OBS_AI_MS_OBS_PASSWORD=${OBSIDIAN_PASSWORD}
       - OBS_AI_MS_ADMIN_TOKEN=${OBS_AI_MS_ADMIN_TOKEN:-}
       - OBS_AI_MS_HOST=${OBS_AI_MS_HOST:-0.0.0.0}
       - OBS_AI_MS_PORT=${OBS_AI_MS_PORT:-8747}
@@ -16,7 +15,6 @@ services:
       - vaults:/vaults
     command: ["/bin/bash", "-c", "
       set -e\n
-      VAULT_PATH=\"/vaults/$$OBSIDIAN_VAULTNAME\"\n
       \n
       apt-get update &&\n
         apt-get install -y --no-install-recommends curl &&\n
@@ -24,16 +22,9 @@ services:
         apt-get install -y --no-install-recommends nodejs &&\n
         rm -rf /var/lib/apt/lists/*\n
       \n
-      npm install -g obsidian-headless\n
-      ob login --email \"$$OBSIDIAN_USERNAME\" --password \"$$OBSIDIAN_PASSWORD\"\n
-      mkdir -p \"$$VAULT_PATH\"\n
-      ob sync-setup --vault \"$$OBSIDIAN_VAULTNAME\" --path \"$$VAULT_PATH\"\n
-      ob sync --path \"$$VAULT_PATH\"\n
-      \n
       pip install --upgrade obsidian-ai-miniserver\n
       \n
-      ob sync --continuous --path \"$$VAULT_PATH\" &\n
-      exec obs_ai_ms start \"$$VAULT_PATH\"\n
+      exec obs_ai_ms start --vault default:sync:/vaults/default\n
     "]
 
 volumes:

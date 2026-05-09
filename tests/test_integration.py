@@ -42,23 +42,31 @@ def _wait_for(port: int, timeout: float = 5.0):
 
 @pytest.fixture
 def vault(tmp_path):
-    """Vault with sample files and known users."""
-    (tmp_path / "notes").mkdir()
-    (tmp_path / "notes" / "test.md").write_text("hello world")
-    (tmp_path / "readme.md").write_text("readme content")
+    """Multi-vault Vault with sample files and known users."""
+    # Work vault
+    work = tmp_path / "work"
+    (work / "notes").mkdir(parents=True)
+    (work / "notes" / "test.md").write_text("hello world")
+    (work / "readme.md").write_text("readme content")
+    (work / ".obsidian").mkdir()
+    (work / ".obsidian" / "daily-notes.json").write_text('{"folder":"Dailies"}')
 
-    obs = tmp_path / ".obsidian"
-    obs.mkdir()
-    (obs / "daily-notes.json").write_text('{"folder":"Dailies"}')
+    # Personal vault
+    personal = tmp_path / "personal"
+    (personal / "journal").mkdir(parents=True)
+    (personal / "journal" / "day1.md").write_text("dear diary")
+    (personal / ".obsidian").mkdir()
 
-    v = Vault(str(tmp_path))
-    v.users = [
+    v = Vault(config_path=str(tmp_path / "config.json"))
+    v.register_vault("work", str(work))
+    v.register_vault("personal", str(personal))
+    v.config.users = [
         User(token="admin-token", is_admin=True),
         User(
             username="reader",
             token="reader-token",
             is_admin=False,
-            access=[PathAccess(path="notes/", read=True, write=False)],
+            access=[PathAccess(path="work:notes/", read=True, write=False)],
         ),
     ]
     v._save_config()
@@ -108,7 +116,7 @@ def mcp_server(vault):
 # --- FastAPI Integration Tests ---
 
 
-def test_api_get_vault_info(api_server):
+def test_api_get_vaults_info(api_server):
     resp = httpx.post(
         f"{api_server}/api/obsidian",
         json={"requests": '[{"kind": "get_vault_info"}]'},
@@ -117,15 +125,16 @@ def test_api_get_vault_info(api_server):
     assert resp.status_code == 200
     data = resp.json()[0]
     assert data["kind"] == "vault_info"
-    assert data["name"]
-    assert data["daily_notes_folder"] == "Dailies"
+    assert isinstance(data["vaults"], list)
+    assert len(data["vaults"]) == 2
+    assert data["user"]["username"] == "admin"
 
 
 def test_api_read_write(api_server):
     # Write
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        json={"requests": '[{"kind": "write_text", "path": "new.md", "text": "integration test"}]'},
+        json={"requests": '[{"kind": "write_text", "path": "work:new.md", "text": "integration test"}]'},
         headers={"Authorization": "Bearer admin-token"},
     )
     assert resp.status_code == 200
@@ -134,7 +143,7 @@ def test_api_read_write(api_server):
     # Read back
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        json={"requests": '[{"kind": "read_text", "path": "new.md"}]'},
+        json={"requests": '[{"kind": "read_text", "path": "work:new.md"}]'},
         headers={"Authorization": "Bearer admin-token"},
     )
     assert resp.status_code == 200
@@ -164,7 +173,7 @@ def test_api_access_denied(api_server):
     # Reader can't read outside allowed path
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        json={"requests": '[{"kind": "read_text", "path": "readme.md"}]'},
+        json={"requests": '[{"kind": "read_text", "path": "work:readme.md"}]'},
         headers={"Authorization": "Bearer reader-token"},
     )
     assert resp.status_code == 200
@@ -175,7 +184,7 @@ def test_api_access_denied(api_server):
     # Reader can't write
     resp = httpx.post(
         f"{api_server}/api/obsidian",
-        json={"requests": '[{"kind": "write_text", "path": "notes/test.md", "text": "hacked"}]'},
+        json={"requests": '[{"kind": "write_text", "path": "work:notes/test.md", "text": "hacked"}]'},
         headers={"Authorization": "Bearer reader-token"},
     )
     assert resp.status_code == 200
@@ -219,7 +228,7 @@ def test_openapi_json_sync(api_server):
     assert resp.status_code == 200
     live = resp.json()
 
-    # Web routes must not appear in the API schema (would confuse AI tool consumers)
+    # Web routes must not appear in the API schema
     for path in live.get("paths", {}):
         assert not path.startswith("/web/"), f"Web route {path} leaked into API openapi.json"
 
@@ -309,8 +318,8 @@ def test_web_logout(api_server):
     assert resp.headers["location"] == "/web/login"
     set_cookie = resp.headers.get("set-cookie", "")
     assert "obs_token" in set_cookie
-    assert 'Max-Age=0' in set_cookie
-    assert 'path=/web' in set_cookie.lower()
+    assert "Max-Age=0" in set_cookie
+    assert "path=/web" in set_cookie.lower()
 
 
 def test_web_unauthenticated_redirect(api_server):
@@ -319,13 +328,14 @@ def test_web_unauthenticated_redirect(api_server):
     assert resp.headers["location"] == "/web/login"
 
 
-def test_web_home_page(api_server, vault):
+def test_web_home_page(api_server):
     resp = httpx.get(
         f"{api_server}/web/",
         cookies={"obs_token": "admin-token"},
     )
     assert resp.status_code == 200
-    assert vault.vault_path.name in resp.text
+    assert "work" in resp.text
+    assert "personal" in resp.text
     assert "admin" in resp.text
 
 
@@ -335,12 +345,13 @@ def test_web_config_page(api_server):
         cookies={"obs_token": "admin-token"},
     )
     assert resp.status_code == 200
-    assert "vault_path" in resp.text
     assert "address" in resp.text
     assert "port" in resp.text
     assert "fqdn" in resp.text
     assert "base_path" in resp.text
     assert "Server Config" in resp.text
+    # No vault_path in multi-vault config
+    assert "vault_path" not in resp.text
 
 
 def test_web_users_page(api_server):
@@ -397,3 +408,36 @@ def test_web_delete_user(api_server):
         cookies={"obs_token": "admin-token"},
     )
     assert "reader" not in resp.text
+
+
+def test_web_vaults_page(api_server):
+    resp = httpx.get(
+        f"{api_server}/web/vaults",
+        cookies={"obs_token": "admin-token"},
+    )
+    assert resp.status_code == 200
+    assert "Vaults" in resp.text
+    assert "work" in resp.text
+    assert "personal" in resp.text
+
+
+def test_web_add_vault(api_server, tmp_path):
+    new_vault = tmp_path / "newvault"
+    new_vault.mkdir()
+    (new_vault / ".obsidian").mkdir()
+
+    resp = httpx.post(
+        f"{api_server}/web/vaults/add",
+        data={"name": "newvault", "dir_path": str(new_vault)},
+        cookies={"obs_token": "admin-token"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/web/vaults"
+
+    # Verify vault appears in vaults list
+    resp = httpx.get(
+        f"{api_server}/web/vaults",
+        cookies={"obs_token": "admin-token"},
+    )
+    assert "newvault" in resp.text
