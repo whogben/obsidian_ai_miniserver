@@ -249,6 +249,6 @@ A standard change log with an entry corresponding to each released version.
 **docker-compose.yaml**
 Deploys the mini-server on a docker container, exposing the port from the env vars above.
 - Base image includes Node.js (for obsidian-headless)
-- Passes `OBS_AI_MS_OBS_USERNAME`, `OBS_AI_MS_OBS_PASSWORD` and vault definitions via env vars
+- All config persisted in a `/data` volume — survives container restarts
+- No `--vault` args; add vaults via the web UI after first run
 - The server handles obs installation, auth and sync internally — no manual scripting needed
-- Example: `obs_ai_ms start --vault default:sync:/vaults/default`

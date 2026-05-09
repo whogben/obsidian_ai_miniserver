@@ -65,6 +65,18 @@ class Vault:
         self._load_config()
         self.sync_manager = None  # type: ignore  # Set by entry.py
 
+    def ensure_sync_manager(self):
+        """Create and start SyncManager if credentials + sync vaults exist but manager is None."""
+        if self.sync_manager is not None:
+            return
+        has_sync = any(v.dir_path.startswith("sync:") for v in self.config.vaults)
+        if has_sync and self.config.obs_username:
+            from .sync import SyncManager
+            self.sync_manager = SyncManager(
+                self.config.obs_username, self.config.obs_password, self.config.vaults
+            )
+            self.sync_manager.start()
+
     @property
     def users(self) -> list[User]:
         return self.config.users
@@ -74,7 +86,7 @@ class Vault:
             self.config = ServerConfig.model_validate_json(self._config_path.read_text())
         else:
             token = secrets.token_urlsafe(16)
-            print(f"Generated admin token: {token}")
+            print("Initialized config — set OBS_AI_MS_ADMIN_TOKEN or see config.json for admin token")
             self.config = ServerConfig(users=[User(token=token)])
             self._save_config()
 
@@ -535,6 +547,8 @@ class Vault:
         else:
             self.config.vaults.append(VaultConfig(name=req.name, dir_path=resolved))
         self._save_config()
-        if resolved.startswith("sync:") and self.sync_manager is not None:
-            self.sync_manager.start_vault(VaultConfig(name=req.name, dir_path=resolved))
+        if resolved.startswith("sync:"):
+            self.ensure_sync_manager()
+            if self.sync_manager is not None:
+                self.sync_manager.start_vault(VaultConfig(name=req.name, dir_path=resolved))
         return Success()

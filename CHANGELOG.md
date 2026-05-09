@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.4.1
+
+- **Docker: persistent config** — all state in a `/data` volume; no `--vault` args needed
+- **Lazy sync manager** — sync starts automatically when credentials are saved via web UI
+- **Config page diagnostics** — shows sync status messages when vaults exist but sync isn't running
+- **Security** — generated admin token no longer printed to stdout
+
 ## 0.4.0
 
 - **Multi-vault support**: Serve multiple Obsidian vaults from one server

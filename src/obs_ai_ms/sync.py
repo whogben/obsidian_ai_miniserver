@@ -127,8 +127,11 @@ class SyncManager:
         if result.returncode != 0:
             log.error("npm install failed (rc=%d): %s", result.returncode, result.stderr.strip())
             return False
+        # npm --prefix installs binaries to <prefix>/bin; ensure it's on PATH
+        bin_dir = os.path.join(user_prefix, "bin")
+        os.environ["PATH"] = os.environ.get("PATH", "") + os.pathsep + bin_dir
         if not shutil.which("ob"):
-            log.error("ob still not found after install")
+            log.error("ob still not found after install (checked %s)", bin_dir)
             return False
         return True
 

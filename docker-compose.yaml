@@ -2,17 +2,18 @@ services:
   obsidian-ai-miniserver:
     image: python:3.11-slim
     environment:
-      - OBS_AI_MS_OBS_USERNAME=${OBSIDIAN_USERNAME}
-      - OBS_AI_MS_OBS_PASSWORD=${OBSIDIAN_PASSWORD}
+      - OBS_AI_MS_CONFIG=/data/config.json
       - OBS_AI_MS_ADMIN_TOKEN=${OBS_AI_MS_ADMIN_TOKEN:-}
       - OBS_AI_MS_HOST=${OBS_AI_MS_HOST:-0.0.0.0}
       - OBS_AI_MS_PORT=${OBS_AI_MS_PORT:-8747}
       - OBS_AI_MS_FQDN=${OBS_AI_MS_FQDN:-}
       - OBS_AI_MS_BASE_PATH=${OBS_AI_MS_BASE_PATH:-}
+      - OBS_AI_MS_OBS_USERNAME=${OBSIDIAN_USERNAME:-}
+      - OBS_AI_MS_OBS_PASSWORD=${OBSIDIAN_PASSWORD:-}
     ports:
       - "${OBS_AI_MS_PORT:-8747}:${OBS_AI_MS_PORT:-8747}"
     volumes:
-      - vaults:/vaults
+      - data:/data
     command: ["/bin/bash", "-c", "
       set -e\n
       \n
@@ -24,8 +25,10 @@ services:
       \n
       pip install --upgrade obsidian-ai-miniserver\n
       \n
-      exec obs_ai_ms start --vault default:sync:/vaults/default\n
+      npm install -g obsidian-headless\n
+      \n
+      exec obs_ai_ms start\n
     "]
 
 volumes:
-  vaults:
+  data:

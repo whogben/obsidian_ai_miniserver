@@ -134,11 +134,18 @@ def create_web_app(
             "users": list(vault.users),
             "obs_password": "••••••" if config.obs_password else "",
         })
+        has_sync_vaults = any(v.dir_path.startswith("sync:") for v in config.vaults)
         sync_log = []
         sync_active = False
         if vault.sync_manager:
             sync_active = vault.sync_manager.is_active
             sync_log = vault.sync_manager.get_recent_log(50)
+        elif has_sync_vaults:
+            sync_active = False
+            if config.obs_username:
+                sync_log = ["Sync configured but not running — check server logs"]
+            else:
+                sync_log = ["Sync vaults configured but Obsidian credentials not set — add them above"]
         autorefresh = request.query_params.get("autorefresh") == "1"
         return HTMLResponse(render_config(
             ConfigPage(config=page_config, sync_log=sync_log, sync_active=sync_active),
@@ -156,6 +163,7 @@ def create_web_app(
         config.obs_username = new_user
         config.obs_password = new_pass
         vault._save_config()
+        vault.ensure_sync_manager()
         return RedirectResponse(f"{config.base_path}/web/config", status_code=303)
 
     # -- User routes --
