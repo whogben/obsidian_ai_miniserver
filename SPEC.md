@@ -53,7 +53,7 @@ A single function interface accepts different kinds of requests and returns diff
 You can run it on the same computer you run Obsidian on, pointing it at one or more vault folders.
 
 **Run Headless in Container**
-Alternatively, you can run it in a container with just the Obsidian sync service, which is much less RAM and overhead than running full electron-based Obsidian. This is optimal for making Obsidian content available via headless cloud server. Supports syncing multiple vaults. Configure `--obs-username`, `--obs-password` and register vaults with `sync:` prefixed paths — the server handles obsidian-headless installation, authentication and continuous sync. Vaults remain accessible from disk even if sync is temporarily unavailable.
+Alternatively, you can run it in a container with just the Obsidian sync service, which is much less RAM and overhead than running full electron-based Obsidian. This is optimal for making Obsidian content available via headless cloud server. Supports syncing multiple vaults. Configure `--obs-username`, `--obs-password` and register vaults with `sync:` prefixed paths — the server handles obsidian-headless installation, authentication, `sync-setup`, `sync-config` with all `ob` file-type buckets, then continuous sync. Vaults remain accessible from disk even if sync is temporarily unavailable.
 
 ----
 ## Implementation
@@ -137,13 +137,14 @@ Defines the main service class, Vault, which:
 	- a path that is not vault aware will be rejected if a user has 2+ vaults, and the user can use GetVaultsInfo to see what vault names are and retry
 	- Non-admins can find out about the vaults they have access to.
 	- Multivault files/search etc results are 1. combined, 2. sorted, 3. limited and offset all together.
+	- `move_file` rename within a vault: scan markdown the user may write for wikilinks and Markdown links to the old path, rewrite to the new path; wikilink `[[basename]]` targets the last segment of the moved path (Obsidian-style); `success.message` when any file changed (see `Success` in models).
 
 **sync.py**
 Manages the obsidian-headless CLI (`ob`) for vaults whose dir_path starts with `sync:`.
 - On startup, if `obs_username` is set and sync vaults exist:
 	- ensure `ob` is installed (`npm install -g obsidian-headless` if missing)
 	- authenticate via `ob login`
-	- for each sync vault: `mkdir -p`, `ob sync-setup`, `ob sync --continuous` as a child subprocess
+	- for each sync vault: `mkdir -p`, `ob sync-setup`, `ob sync-config` (all `--file-types`), `ob sync --continuous` as a child subprocess
 - Remote vault name = `basename(local_path)` — e.g. `sync:/vaults/MyNotes` syncs Obsidian vault "MyNotes"
 - All sync processes are children of the server — they stop when it stops
 - Tracks running processes by vault name to prevent double-starting
@@ -178,11 +179,11 @@ Run by the CLI command to start the combined server with OpenAPI, Streamable HTT
 Runs pre-deploy checks and gives the option to publish to pypi.
 - pre-deploy checks:
 	- local version > than published
-	- changelog has entry for local version
+	- changelog: does not have a **`## Unreleased`** and does have a **`##`** section matching local version; deploy requires a version section (rename Unreleased when publishing). Use Unreleased only when there is unreleased work—omit it when the tree matches the last release.
 	- all tests pass
 	- runs update_screenshots.py
-	- local changes are committed to git
-	- pypi token in env vars or passed in as an arg
+	- local changes are committed to git (optional `--skip-git-clean` for `--check` only)
+	- pypi token in env vars or passed in as an arg (optional `--skip-pypi-token` for `--check` only; deploy always needs a token)
 - deploy:
 	- rebuild distributables
 	- tag version on latest commit
@@ -244,7 +245,7 @@ A brief project readme covering:
 - (use absolute links to the github file browser's latest version of the file for all internal references so they work on pypi too)
 
 **CHANGELOG.md**
-A standard change log with an entry corresponding to each released version.
+A [Keep a Changelog](https://keepachangelog.com/)-style log: use **`## Unreleased`** only while there are changes not yet released—accumulate bullets there, and **remove** the Unreleased section when there is nothing pending (do not keep an empty placeholder). Do not add a dated **`## x.y.z`** section until you ship; unreleased work stays under Unreleased only. When cutting a release, rename **`## Unreleased`** to **`## x.y.z`** (matching `pyproject.toml`), bump version if needed, and publish.
 
 **docker-compose.yaml**
 Deploys the mini-server on a docker container, exposing the port from the env vars above.

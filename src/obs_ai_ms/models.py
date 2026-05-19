@@ -189,7 +189,10 @@ class Success(BaseResponse):
     """Default response."""
 
     kind: Literal["success"] = "success"
-    message: str = Field(default="")
+    message: str | None = Field(
+        default=None,
+        description='Omitted when absent. After move_file rename, e.g. "Updates links in 1 file" / "Updates links in N files".',
+    )
 
 
 class Error(BaseResponse):
