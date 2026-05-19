@@ -36,6 +36,7 @@ from .models import (
     VaultsInfo,
     WriteText,
 )
+from .obsidian_links import rewrite_links_in_markdown
 
 
 class PathEscapeError(ValueError):
@@ -129,6 +130,8 @@ class Vault:
                 return "sync pending"
             return f"unavailable - missing dir {dir_path}"
         if not (p / ".obsidian").exists():
+            if vc.dir_path.startswith("sync:"):
+                return "sync pending"
             return f"unavailable - dir not a vault {dir_path}"
         return "ok"
 
@@ -358,15 +361,58 @@ class Vault:
         if new.exists():
             return Error(message=f"File already exists: {req.new_path}")
         new.parent.mkdir(parents=True, exist_ok=True)
+        link_updates = 0
         if req.make_copy:
             shutil.copy2(str(old), str(new))
         elif old_vault.dir_path == new_vault.dir_path:
             shutil.move(str(old), str(new))
+            link_updates = self._rewrite_links_after_rename(
+                old_vault, old_rel, new_rel, user
+            )
         else:
             # Cross-vault: copy + delete for different filesystems
             shutil.copy2(str(old), str(new))
             old.unlink()
-        return Success()
+        if not link_updates:
+            msg = None
+        elif link_updates == 1:
+            msg = "Updates links in 1 file"
+        else:
+            msg = f"Updates links in {link_updates} files"
+        return Success(message=msg)
+
+    def _rewrite_links_after_rename(
+        self,
+        vault: VaultConfig,
+        old_rel: str,
+        new_rel: str,
+        user: User,
+    ) -> int:
+        """Rewrite inbound Obsidian links in the vault. Returns number of files modified."""
+        base = Path(self._resolve_dir_path(vault))
+        if not base.is_dir():
+            return 0
+        old_rel = old_rel.replace("\\", "/")
+        new_rel = new_rel.replace("\\", "/")
+        modified = 0
+        for md_path in base.rglob("*.md"):
+            try:
+                rel = md_path.relative_to(base.resolve()).as_posix()
+            except ValueError:
+                continue
+            if any(p.startswith(".") for p in Path(rel).parts):
+                continue
+            if not self.check_access(user, vault.name, rel, True):
+                continue
+            try:
+                text = md_path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            new_text = rewrite_links_in_markdown(text, old_rel, new_rel, rel)
+            if new_text != text:
+                md_path.write_text(new_text, encoding="utf-8")
+                modified += 1
+        return modified
 
     def _list_files(self, req, user: User) -> FilesList | Error:
         parsed = self._parse_path(user, req.path)

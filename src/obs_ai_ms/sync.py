@@ -14,6 +14,9 @@ from .models import VaultConfig
 
 log = logging.getLogger(__name__)
 
+# Obsidian headless: all attachment buckets Obsidian Sync exposes via `ob sync-config --file-types`.
+_OB_SYNC_ALL_FILE_TYPES = "image,audio,video,pdf,unsupported"
+
 
 class SyncManager:
     """Manages obsidian-headless CLI (`ob`) for sync-managed vaults."""
@@ -172,10 +175,38 @@ class SyncManager:
             )
         except Exception as e:
             log.error("ob sync-setup failed for %s: %s", vault_name, e)
+            self._append_log(vault_name, f"sync-setup failed: {e}")
             return
         if result.returncode != 0:
-            log.error("ob sync-setup failed for %s: %s", vault_name, result.stderr.strip())
+            err = result.stderr.strip()
+            log.error("ob sync-setup failed for %s: %s", vault_name, err)
+            self._append_log(vault_name, f"sync-setup failed: {err}")
             return
+
+        cfg_cmd = [
+            "ob",
+            "sync-config",
+            "--path",
+            local_path,
+            "--file-types",
+            _OB_SYNC_ALL_FILE_TYPES,
+        ]
+        self._log_cmd(vault_name, cfg_cmd)
+        try:
+            cfg_result = subprocess.run(cfg_cmd, capture_output=True, text=True, timeout=30)
+        except Exception as e:
+            log.error("ob sync-config failed for %s: %s", vault_name, e)
+            self._append_log(vault_name, f"sync-config failed: {e}")
+        else:
+            if cfg_result.returncode != 0:
+                err = cfg_result.stderr.strip()
+                log.error("ob sync-config failed for %s: %s", vault_name, err)
+                self._append_log(vault_name, f"sync-config failed: {err}")
+            else:
+                self._append_log(
+                    vault_name,
+                    f"sync-config: --file-types {_OB_SYNC_ALL_FILE_TYPES}",
+                )
 
         try:
             proc = subprocess.Popen(
@@ -198,3 +229,7 @@ class SyncManager:
     def _log_cmd(self, vault_name: str, cmd: list[str]) -> None:
         with self._lock:
             self._log.append((time.time(), vault_name, "$ " + " ".join(cmd)))
+
+    def _append_log(self, vault_name: str, line: str) -> None:
+        with self._lock:
+            self._log.append((time.time(), vault_name, line))

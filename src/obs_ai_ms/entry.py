@@ -140,7 +140,9 @@ def create_api(vault: Vault, config: ServerConfig | None = None, lifespan=None) 
         parsed = TypeAdapter(list[ServerRequest]).validate_json(body.requests)
         result = vault.obsidian(parsed, user)
         return Response(
-            content=TypeAdapter(list[ServerResponse]).dump_json(result),
+            content=TypeAdapter(list[ServerResponse]).dump_json(
+                result, exclude_none=True
+            ),
             media_type="application/json",
         )
 
@@ -168,11 +170,13 @@ def create_mcp(vault: Vault) -> FastMCP:
         user = _authenticate(vault, token)
         if not user:
             return TypeAdapter(list[ServerResponse]).dump_json(
-                [Error(message="Invalid token")]
+                [Error(message="Invalid token")], exclude_none=True
             ).decode()
         parsed = TypeAdapter(list[ServerRequest]).validate_json(requests)
         result = vault.obsidian(parsed, user)
-        return TypeAdapter(list[ServerResponse]).dump_json(result).decode()
+        return TypeAdapter(list[ServerResponse]).dump_json(
+            result, exclude_none=True
+        ).decode()
 
     # Override tool description with full schema text
     tool = mcp._local_provider._components.get("tool:obsidian@")

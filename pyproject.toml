@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "obsidian-ai-miniserver"
-version = "0.4.1"
+version = "0.4.2"
 description = "Expose your Obsidian vault via REST API and streamable HTTP MCP server for AI tool access"
 readme = "README.md"
 authors = [{ name = "William Hogben", email = "will@willhogben.com" }]
@@ -38,3 +38,7 @@ obs_ai_ms = "obs_ai_ms.entry:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
