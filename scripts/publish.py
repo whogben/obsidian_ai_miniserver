@@ -19,6 +19,15 @@ CHANGELOG = ROOT / "CHANGELOG.md"
 PYPI_URL = "https://pypi.org/pypi/obsidian-ai-miniserver/json"
 
 
+def project_python() -> str:
+    """Prefer project .venv so checks see installed deps (obs_ai_ms, uvicorn, etc.)."""
+    for name in ("python", "python3"):
+        candidate = ROOT / ".venv" / "bin" / name
+        if candidate.is_file():
+            return str(candidate)
+    return sys.executable
+
+
 def read_version() -> str:
     with open(PYPROJECT, "rb") as f:
         return tomllib.load(f)["project"]["version"]
@@ -46,26 +55,50 @@ def check_version(version: str) -> bool:
     return False
 
 
-def check_changelog(version: str) -> bool:
+def changelog_sections(text: str) -> set[str]:
+    """Parse `##` section titles (Keep a Changelog style)."""
+    sections: set[str] = set()
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("##") or stripped.startswith("###"):
+            continue
+        header = stripped[2:].strip().lstrip("v")
+        if header.startswith("["):
+            header = header[1:].split("]")[0]
+        elif " - " in header:
+            header = header.split(" - ", 1)[0].strip()
+        sections.add(header)
+    return sections
+
+
+def check_changelog(version: str, *, deploy: bool) -> bool:
     if not CHANGELOG.exists():
         print(f"  ✗ {CHANGELOG.name} not found")
         return False
     text = CHANGELOG.read_text()
-    # Match version headers like "## 0.1.0", "## v0.1.0", "## [0.1.0] - date"
-    for line in text.splitlines():
-        header = line.strip().lstrip("#").strip().lstrip("v")
-        if header.startswith("["):
-            header = header[1:].split("]")[0]
-        if header == version:
-            print(f"  ✓ Changelog has entry for {version}")
+    sections = changelog_sections(text)
+    if deploy:
+        if version in sections:
+            print(f"  ✓ Changelog has release section for {version}")
             return True
-    print(f"  ✗ Changelog missing entry for {version}")
+        print(
+            f"  ✗ Changelog missing release section for {version} "
+            "(rename ## Unreleased to match pyproject before deploy)"
+        )
+        return False
+    if version in sections:
+        print(f"  ✓ Changelog has entry for {version}")
+        return True
+    if "Unreleased" in sections:
+        print("  ✓ Changelog has ## Unreleased (fold into release version before deploy)")
+        return True
+    print(f"  ✗ Changelog missing ## Unreleased or entry for {version}")
     return False
 
 
 def check_tests() -> bool:
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", "-q"],
+        [project_python(), "-m", "pytest", "-q"],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -82,7 +115,7 @@ def check_tests() -> bool:
 
 def check_screenshots() -> bool:
     result = subprocess.run(
-        [sys.executable, str(ROOT / "scripts" / "update_screenshots.py")],
+        [project_python(), str(ROOT / "scripts" / "update_screenshots.py")],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -122,19 +155,32 @@ def check_token(token: str | None) -> str | None:
     return None
 
 
-def run_checks(token: str | None) -> tuple[bool, str | None]:
+def run_checks(
+    token: str | None,
+    *,
+    skip_git_clean: bool = False,
+    skip_pypi_token: bool = False,
+    deploy: bool = False,
+) -> tuple[bool, str | None]:
     """Run all pre-deploy checks. Returns (all_passed, resolved_token)."""
     version = read_version()
     print(f"Pre-deploy checks for obsidian-ai-miniserver v{version}:\n")
 
     results = []
     results.append(check_version(version))
-    results.append(check_changelog(version))
+    results.append(check_changelog(version, deploy=deploy))
     results.append(check_tests())
     results.append(check_screenshots())
-    results.append(check_git_clean())
-    tok = check_token(token)
-    results.append(tok is not None)
+    if skip_git_clean:
+        print("  (skipped git clean — working tree may have uncommitted changes)")
+    else:
+        results.append(check_git_clean())
+    if skip_pypi_token:
+        print("  (skipped PyPI token check)")
+        tok = token or os.environ.get("TWINE_TOKEN") or os.environ.get("TWINE_PASSWORD")
+    else:
+        tok = check_token(token)
+        results.append(tok is not None)
 
     print()
     all_passed = all(results)
@@ -154,7 +200,7 @@ def deploy(version: str, token: str) -> None:
 
     # Build distributables
     print("  Building distributables...")
-    subprocess.run([sys.executable, "-m", "build"], cwd=ROOT, check=True)
+    subprocess.run([project_python(), "-m", "build"], cwd=ROOT, check=True)
 
     # Git tag (skip if already exists from a partial deploy)
     tag = f"v{version}"
@@ -174,7 +220,7 @@ def deploy(version: str, token: str) -> None:
         print("  ✗ No files found in dist/")
         sys.exit(1)
     subprocess.run(
-        ["twine", "upload", *dist_files],
+        [project_python(), "-m", "twine", "upload", *dist_files],
         env={**os.environ, "TWINE_PASSWORD": token, "TWINE_USERNAME": "__token__"},
         check=True,
     )
@@ -186,18 +232,40 @@ def main() -> None:
     parser.add_argument("--check", action="store_true", help="Run checks only (default)")
     parser.add_argument("--deploy", action="store_true", help="Run checks then deploy")
     parser.add_argument("--token", help="PyPI API token (or set TWINE_TOKEN)")
+    parser.add_argument(
+        "--skip-git-clean",
+        action="store_true",
+        help="Do not require a clean git working tree (for local release prep)",
+    )
+    parser.add_argument(
+        "--skip-pypi-token",
+        action="store_true",
+        help="Do not require TWINE_TOKEN (cannot use with --deploy)",
+    )
     args = parser.parse_args()
 
     # Default to --check if nothing specified
     if not args.deploy:
         args.check = True
 
-    passed, token = run_checks(args.token)
+    if args.deploy and args.skip_pypi_token:
+        print("Cannot --deploy with --skip-pypi-token.", file=sys.stderr)
+        sys.exit(1)
+
+    passed, token = run_checks(
+        args.token,
+        skip_git_clean=args.skip_git_clean,
+        skip_pypi_token=args.skip_pypi_token,
+        deploy=args.deploy,
+    )
 
     if not passed:
         sys.exit(1)
 
     if args.deploy:
+        if not token:
+            print("Deploy requires a PyPI token.", file=sys.stderr)
+            sys.exit(1)
         deploy(read_version(), token)
     elif not args.check:
         # Neither flag set — just ran checks

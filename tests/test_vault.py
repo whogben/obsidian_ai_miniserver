@@ -128,9 +128,37 @@ def test_move_file(vault, admin):
         admin,
     )
     assert resp[0].kind == "success"
+    assert resp[0].message is None
     work_dir = next(Path(v.dir_path) for v in vault.config.vaults if v.name == "work")
     assert not (work_dir / "notes" / "test.md").exists()
     assert (work_dir / "notes" / "renamed.md").read_text() == "hello world"
+
+
+def test_move_file_updates_inbound_links_and_message(vault, admin):
+    work_dir = next(Path(v.dir_path) for v in vault.config.vaults if v.name == "work")
+    (work_dir / "notes" / "linker.md").write_text(
+        "See [[notes/test]] and [t](test.md).\n", encoding="utf-8"
+    )
+    resp = vault.obsidian(
+        [MoveFile(old_path="work:notes/test.md", new_path="work:notes/renamed.md")],
+        admin,
+    )
+    assert resp[0].kind == "success"
+    assert resp[0].message == "Updates links in 1 file"
+    text = (work_dir / "notes" / "linker.md").read_text(encoding="utf-8")
+    assert "[[notes/renamed]]" in text
+    assert "renamed.md" in text
+
+
+def test_move_file_link_update_message_plural(vault, admin):
+    work_dir = next(Path(v.dir_path) for v in vault.config.vaults if v.name == "work")
+    (work_dir / "notes" / "one.md").write_text("[[notes/test]]", encoding="utf-8")
+    (work_dir / "notes" / "two.md").write_text("[x](test.md)", encoding="utf-8")
+    resp = vault.obsidian(
+        [MoveFile(old_path="work:notes/test.md", new_path="work:notes/z.md")],
+        admin,
+    )
+    assert resp[0].message == "Updates links in 2 files"
 
 
 def test_list_files(vault, admin):

@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.4.2
+
+- **`move_file` renames update backlinks** — within the same vault, wikilinks (`[[path]]`, headings, display text) and normal `[label](url)` links that resolve to the moved file are rewritten; response `success.message` is set when at least one other note was changed (e.g. `Updates links in 1 file` / `Updates links in N files`); `message` is omitted from JSON when unset
+- **Wikilink `[[basename]]`** — matches nested notes by last path segment (aligned with Obsidian); if multiple notes share a basename, short links may all be rewritten (same ambiguity as Obsidian choosing one target)
+- **No link rewrite** for copy, delete, or cross-vault moves
+- **Headless sync: all attachment file types** — after `ob sync-setup`, runs `ob sync-config` with every `--file-types` bucket (`image`, `audio`, `video`, `pdf`, `unsupported`) so the server copy is not limited to Markdown-style defaults
+- **Fix: `ob` not found in Docker** — adds `~/.local/bin` to PATH after npm install; pre-installs `obsidian-headless` in docker-compose
+- **Fix: sync vault status** — sync vaults without `.obsidian/` show "sync pending" instead of "dir not a vault"
+- **Fix: sync errors visible** — sync-setup failures now appear in the web UI sync log
+- **Publish script** — optional `--skip-git-clean` / `--skip-pypi-token` for `publish.py --check` when preparing a release without committing or PyPI credentials
+
 ## 0.4.1
 
 - **Docker: persistent config** — all state in a `/data` volume; no `--vault` args needed
