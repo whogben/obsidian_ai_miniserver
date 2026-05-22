@@ -10,6 +10,8 @@ from pathlib import Path
 
 from platformdirs import user_config_dir
 
+from pydantic import ValidationError
+
 from .models import (
     AdminListUsers,
     AdminUpsertUser,
@@ -176,7 +178,8 @@ class Vault:
                 return [(v, rel_path) for v in user_vaults]
             vault = next((v for v in user_vaults if v.name == vault_name), None)
             if not vault:
-                return Error(message=f"Vault not found or access denied: {vault_name}")
+                names = ", ".join(v.name for v in user_vaults)
+                return Error(message=f"Vault not found or access denied: {vault_name}. Available: {names}")
             return [(vault, rel_path)]
 
         # No prefix — single-vault shortcut
@@ -184,7 +187,8 @@ class Vault:
             return [(user_vaults[0], path)]
         if not user_vaults:
             return Error(message="No accessible vaults")
-        return Error(message="Ambiguous path — specify vault, e.g. 'vaultname:path'")
+        names = ", ".join(v.name for v in user_vaults)
+        return Error(message=f"Ambiguous path — use format 'vaultname:path' (e.g. '{user_vaults[0].name}:{path or 'notes/example.md'}'). Available: {names}")
 
     def _resolve(self, vault_config: VaultConfig, rel: str) -> Path:
         base = Path(self._resolve_dir_path(vault_config)).resolve()
@@ -230,7 +234,14 @@ class Vault:
     # -- Dispatch --
 
     def obsidian(self, requests: list[ServerRequest], user: User) -> list[ServerResponse]:
-        return [self._handle_one(r, user) for r in requests]
+        results: list[ServerResponse] = []
+        for r in requests:
+            try:
+                results.append(self._handle_one(r, user))
+            except ValidationError as e:
+                errors = [f"{err['loc'][-1]}: {err['msg']}" for err in e.errors()]
+                results.append(Error(message=f"{r.kind}: {'; '.join(errors)}"))
+        return results
 
     def _handle_one(self, request: ServerRequest, user: User) -> ServerResponse:
         # Admin-only operations
@@ -269,13 +280,14 @@ class Vault:
 
     def _get_vaults_info(self, _req, user: User) -> VaultsInfo:
         safe_user = user.model_copy(update={"token": ""})
-        vaults = [
-            v.model_copy(update={
+        vaults = []
+        for v in self._user_vaults(user):
+            vc = v.model_copy(update={
                 "status": self._compute_status(v),
-                "daily_notes_folder": self._daily_notes_folder(v),
+                "dir_path": None,  # excluded from response — internal detail
+                "daily_notes_folder": self._daily_notes_folder(v) or None,
             })
-            for v in self._user_vaults(user)
-        ]
+            vaults.append(vc)
         msg = 'Paths: "vault:path", "*:" or "" = all.' if len(vaults) >= 2 else ""
         if user.is_admin and self.sync_manager is not None:
             line = self.sync_manager.get_latest_line()
@@ -464,7 +476,7 @@ class Vault:
             stat = child.stat()
             modified = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
             if child.is_dir():
-                out.append((rel, modified, 0, f"{rel} | {modified} | 0 b"))
+                out.append((rel + "/", modified, 0, f"{rel}/ | {modified} | 0 b"))
                 self._walk(child, extensions, max_depth, depth + 1, rel, out)
             elif child.is_file() and (not extensions or child.suffix in extensions):
                 size = stat.st_size

@@ -15,7 +15,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_request
 
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from .models import Error, ObsidianBody, ServerConfig, ServerRequest, ServerResponse, TOOL_PROMPT
 from .sync import SyncManager
@@ -137,7 +137,16 @@ def create_api(vault: Vault, config: ServerConfig | None = None, lifespan=None) 
         user = _authenticate(vault, token)
         if not user:
             raise HTTPException(status_code=401, detail="Invalid token")
-        parsed = TypeAdapter(list[ServerRequest]).validate_json(body.requests)
+        try:
+            parsed = TypeAdapter(list[ServerRequest]).validate_json(body.requests)
+        except ValidationError as e:
+            errors = [f"{err['loc'][-1]}: {err['msg']}" for err in e.errors()]
+            return Response(
+                content=TypeAdapter(list[ServerResponse]).dump_json(
+                    [Error(message=f"Invalid request: {'; '.join(errors)}")], exclude_none=True
+                ),
+                media_type="application/json",
+            )
         result = vault.obsidian(parsed, user)
         return Response(
             content=TypeAdapter(list[ServerResponse]).dump_json(
@@ -172,7 +181,13 @@ def create_mcp(vault: Vault) -> FastMCP:
             return TypeAdapter(list[ServerResponse]).dump_json(
                 [Error(message="Invalid token")], exclude_none=True
             ).decode()
-        parsed = TypeAdapter(list[ServerRequest]).validate_json(requests)
+        try:
+            parsed = TypeAdapter(list[ServerRequest]).validate_json(requests)
+        except ValidationError as e:
+            errors = [f"{err['loc'][-1]}: {err['msg']}" for err in e.errors()]
+            return TypeAdapter(list[ServerResponse]).dump_json(
+                [Error(message=f"Invalid request: {'; '.join(errors)}")], exclude_none=True
+            ).decode()
         result = vault.obsidian(parsed, user)
         return TypeAdapter(list[ServerResponse]).dump_json(
             result, exclude_none=True

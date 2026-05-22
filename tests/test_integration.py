@@ -298,6 +298,37 @@ def test_web_login_success(api_server):
     assert "obs_token" in resp.headers.get("set-cookie", "")
 
 
+def test_web_login_http_with_https_fqdn(vault, api_server):
+    """Secure must not follow fqdn when the browser connects over HTTP."""
+    vault.config.fqdn = "https://example.com"
+    resp = httpx.post(
+        f"{api_server}/web/login",
+        data={"access_token": "admin-token"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    set_cookie = resp.headers.get("set-cookie", "").lower()
+    assert "secure" not in set_cookie
+    resp = httpx.get(
+        f"{api_server}/web/",
+        cookies=resp.cookies,
+        follow_redirects=False,
+    )
+    assert resp.status_code == 200
+
+
+def test_web_login_secure_behind_proxy(vault, api_server):
+    vault.config.fqdn = "http://example.com"
+    resp = httpx.post(
+        f"{api_server}/web/login",
+        data={"access_token": "admin-token"},
+        headers={"X-Forwarded-Proto": "https"},
+        follow_redirects=False,
+    )
+    set_cookie = resp.headers.get("set-cookie", "").lower()
+    assert "secure" in set_cookie
+
+
 def test_web_login_invalid_token(api_server):
     resp = httpx.post(
         f"{api_server}/web/login",

@@ -9,6 +9,8 @@ TOOL_PROMPT = """\
 Access one or more Obsidian vaults.
 Send a JSON array string: '[{{"kind":"get_vault_info"}}, ...]'
 
+Paths: "vaultname:path", "*:" or "" = all vaults. With one vault, plain paths work.
+
 Request kinds:
 {request_kinds}
 """
@@ -51,8 +53,8 @@ class VaultConfig(BaseModel):
     # defaults to vault's dir name
     # used with any path to be vault-aware as
     # "name:some/path/to/note.md"
-    dir_path: str = Field(...)
-    daily_notes_folder: str = Field(default="")
+    dir_path: str | None = Field(default=None)
+    daily_notes_folder: str | None = Field(default=None)
     status: str = Field(default="")
     # - "ok"
     # - "unavailable - not configured"
@@ -120,8 +122,8 @@ class MoveFile(BaseRequest):
 
 class ListFiles(BaseRequest):
     """
-    Folder tree, returns:
-    `<path> | <modified_at> | <length>`
+    Folder tree. Folders end with /.
+    Returns: `<path> | <modified_at> | <size unit>`
     """
 
     kind: Literal["list_files"] = "list_files"

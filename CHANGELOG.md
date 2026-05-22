@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.4.3
+
+- **Agent usability: path format in tool description** — tool prompt now includes `Paths: "vaultname:path", "*:" or "" = all vaults. With one vault, plain paths work.` so AI agents see the format without needing a runtime response
+- **Agent usability: folders end with `/`** — `list_files` entries for folders now show a trailing `/` (e.g. `Daily Notes/`) so agents can distinguish folders from files
+- **Agent usability: `dir_path` excluded from vault info** — the internal filesystem path no longer appears in API/MCP responses, preventing agents from trying to use `sync:/data/Pers` as an API path
+- **Agent usability: `daily_notes_folder` omitted when absent** — instead of returning an empty string (which implied "no daily notes"), the field is excluded when the vault has no daily-notes plugin config
+- **Agent usability: actionable error messages** — ambiguous-path and vault-not-found errors now include concrete examples using the user's actual vault names (e.g. `e.g. 'work:readme.md'). Available: work, personal`)
+- **Agent usability: clean validation errors** — malformed requests return `"Invalid request: pattern: Field required"` instead of raw Pydantic tracebacks
+- **Fix: web login over HTTP** — auth cookie `Secure` flag follows the request scheme (and `X-Forwarded-Proto` behind a reverse proxy), not `--fqdn`, so logging in on HTTP works when `fqdn` is still `https://…`
+
 ## 0.4.2
 
 - **`move_file` renames update backlinks** — within the same vault, wikilinks (`[[path]]`, headings, display text) and normal `[label](url)` links that resolve to the moved file are rewritten; response `success.message` is set when at least one other note was changed (e.g. `Updates links in 1 file` / `Updates links in N files`); `message` is omitted from JSON when unset

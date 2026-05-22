@@ -1,6 +1,6 @@
 # obsidian-ai-miniserver
 
-A complete Obsidian tool in ~326 tokens! ([see tool_prompt.md](https://github.com/whogben/obsidian_ai_miniserver/blob/main/tool_prompt.md))
+A complete Obsidian tool in ~356 tokens! ([see tool_prompt.md](https://github.com/whogben/obsidian_ai_miniserver/blob/main/tool_prompt.md))
 
 Makes one or more Obsidian vaults accessible via REST API (OpenAPI), streamable HTTP MCP server, and Web UI. Enables AI to find, read, and edit text notes across vaults. Supports multiple users with token-based auth and per-vault path-level access control.
 
@@ -30,7 +30,7 @@ Browse the API on [Redocly](https://redocly.github.io/redoc/?url=https://raw.git
 ### Maximum Token Efficiency
 - Ruthless minimalism: single CLI command, single tool interface for AI, AI can perform all admin work
 - Less tokens = faster and cheaper
-- The entire tool schema uses ~326 tokens thanks to minimized docstrings, zero duplication or boilerplate — see [tool_prompt.md](https://github.com/whogben/obsidian_ai_miniserver/blob/main/tool_prompt.md)
+- The entire tool schema uses ~356 tokens thanks to minimized docstrings, zero duplication or boilerplate — see [tool_prompt.md](https://github.com/whogben/obsidian_ai_miniserver/blob/main/tool_prompt.md)
 - ~50% token savings on MCP tokens after trimming FastMCP generated schemas with no information loss
 - Responses with repeated keys (search results, file lists) are flattened into text formats for savings on every result — e.g. `path | modified_at | length` and `path:line | match | context`
 

@@ -55,6 +55,14 @@ class WebRedirect(Exception):
         self.url = url
 
 
+def _cookie_secure(request: Request) -> bool:
+    """Whether the auth cookie should use Secure for this browser connection."""
+    forwarded = request.headers.get("x-forwarded-proto", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip().lower() == "https"
+    return request.url.scheme == "https"
+
+
 def create_web_app(
     vault: Vault,
     config: ServerConfig,
@@ -99,14 +107,14 @@ def create_web_app(
             httponly=True,
             samesite="strict",
             path="/web",
-            secure=config.fqdn.startswith("https"),
+            secure=_cookie_secure(request),
         )
         return resp
 
     @web.post("/logout")
-    def web_logout():
+    def web_logout(request: Request):
         resp = RedirectResponse(f"{config.base_path}/web/login", status_code=303)
-        resp.delete_cookie("obs_token", path="/web")
+        resp.delete_cookie("obs_token", path="/web", secure=_cookie_secure(request))
         return resp
 
     @web.get("/", response_class=HTMLResponse)
